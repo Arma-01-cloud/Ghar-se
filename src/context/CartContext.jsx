@@ -12,9 +12,10 @@ export const CartProvider = ({ children }) => {
   // Saved Customer Name State
   const [customerName, setCustomerNameState] = useState(() => {
     try {
-      return localStorage.getItem('gharsee_customer_name') || 'Customer';
+      const saved = localStorage.getItem('gharsee_customer_name');
+      return saved && saved !== 'Customer' ? saved : '';
     } catch {
-      return 'Customer';
+      return '';
     }
   });
 
@@ -351,10 +352,10 @@ export const CartProvider = ({ children }) => {
     setCart([]);
   };
 
-  // Specific Store Order Placement (Persisted to Supabase with real customerName)
+  // Specific Store Order Placement (Persisted to Supabase with real customerName & customerPhone)
   const placeOrder = async (orderDetails) => {
-    const phoneNum = customerPhone || orderDetails.phone || '+91 81238 21300';
-    const cName = orderDetails.fullName || customerName || 'Customer';
+    const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
+    const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
 
     const newOrder = {
       id: `GK-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -404,8 +405,8 @@ export const CartProvider = ({ children }) => {
 
   // "Shop From Any Store" Custom Order Placement
   const placeAnyStoreOrder = async (groceryListItems, orderDetails) => {
-    const phoneNum = customerPhone || orderDetails.phone || '+91 81238 21300';
-    const cName = orderDetails.fullName || customerName || 'Customer';
+    const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
+    const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
 
     const newOrder = {
       id: `GS-${Math.floor(10000 + Math.random() * 90000)}`,

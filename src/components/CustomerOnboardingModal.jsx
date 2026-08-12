@@ -3,6 +3,7 @@ import { MapPin, Phone, Compass, CheckCircle2, AlertCircle, Loader2, Building2, 
 import { getCurrentPositionCoordinates, fetchCustomerAddressByPhone, saveCustomerPhoneAddress } from '../services/locationService';
 import { useCart } from '../context/CartContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { get10DigitPhone } from '../services/authService';
 
 export default function CustomerOnboardingModal({ isOpen, onClose }) {
   const { setCustomerLocation, setCustomerPhone, setCustomerName, customerPhone: contextPhone, addToast } = useCart();
@@ -12,7 +13,7 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
   });
   const [phone, setPhone] = useState(contextPhone || '');
   const [isSearchingPhone, setIsSearchingPhone] = useState(false);
-  const [existingAddress, setExistingAddress] = useState(null);
+  const [existingCustomer, setExistingCustomer] = useState(null);
 
   const [selectedLocality, setSelectedLocality] = useState(null);
   const [isDetectingGPS, setIsDetectingGPS] = useState(false);
@@ -31,30 +32,35 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
     { name: 'Mangaluru, Karnataka', latitude: 12.9141, longitude: 74.8560, label: 'Mangaluru' }
   ];
 
-  // Auto-search saved address when phone number reaches 10 digits
+  // Auto-search Supabase database whenever phone number reaches 10 digits
   useEffect(() => {
-    async function checkPhoneHistory() {
-      const cleanDigits = phone.replace(/\D/g, '');
+    async function checkSupabaseCustomerHistory() {
+      const cleanDigits = get10DigitPhone(phone);
       if (cleanDigits.length === 10) {
         setIsSearchingPhone(true);
-        const addr = await fetchCustomerAddressByPhone(cleanDigits);
+        const customerData = await fetchCustomerAddressByPhone(cleanDigits);
         setIsSearchingPhone(false);
-        if (addr) {
-          setExistingAddress(addr);
-          if (addr.full_name) {
-            setFullName(addr.full_name);
+
+        if (customerData) {
+          setExistingCustomer(customerData);
+          if (customerData.full_name) {
+            setFullName(customerData.full_name);
           }
-          setSelectedLocality({
-            name: addr.address_text || `${addr.street}, ${addr.city}`,
-            latitude: addr.latitude ? parseFloat(addr.latitude) : 13.3161,
-            longitude: addr.longitude ? parseFloat(addr.longitude) : 75.7720
-          });
+          if (customerData.address_text) {
+            setSelectedLocality({
+              name: customerData.address_text || `${customerData.street || ''}, ${customerData.city || 'Chikkamagaluru'}`.trim(),
+              latitude: customerData.latitude ? parseFloat(customerData.latitude) : 13.3161,
+              longitude: customerData.longitude ? parseFloat(customerData.longitude) : 75.7720
+            });
+          }
+        } else {
+          setExistingCustomer(null);
         }
       } else {
-        setExistingAddress(null);
+        setExistingCustomer(null);
       }
     }
-    checkPhoneHistory();
+    checkSupabaseCustomerHistory();
   }, [phone]);
 
   if (!isOpen) return null;
@@ -89,7 +95,7 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
       setErrorMsg('Please enter your full name.');
       return;
     }
-    const cleanDigits = phone.replace(/\D/g, '');
+    const cleanDigits = get10DigitPhone(phone);
     if (cleanDigits.length < 10) {
       setErrorMsg('Please enter a valid 10-digit mobile phone number.');
       return;
@@ -114,21 +120,7 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
 
     setCustomerLocation(selectedLocality);
 
-    // Save profile and address snapshot to Supabase database
-    if (isSupabaseConfigured) {
-      try {
-        await supabase
-          .from('profiles')
-          .upsert({
-            phone: normalizedPhone,
-            full_name: nameVal,
-            role: 'customer'
-          }, { onConflict: 'phone' });
-      } catch (err) {
-        console.error('Error upserting customer profile:', err);
-      }
-    }
-
+    // Save/Update NEW or EXISTING customer in Supabase database
     await saveCustomerPhoneAddress({
       phone: normalizedPhone,
       fullName: nameVal,
@@ -171,32 +163,10 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
 
         <form onSubmit={handleSaveAndContinue} className="space-y-4">
           
-          {/* STEP 1: FULL NAME */}
+          {/* STEP 1: MOBILE PHONE NUMBER (FIRST FOR FAST LOOKUP) */}
           <div className="space-y-1.5">
             <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700">
-              1. Your Full Name <span className="text-rose-500">*</span>
-            </label>
-            
-            <div className="relative">
-              <input
-                type="text"
-                required
-                placeholder="Rahul Kumar"
-                value={fullName}
-                onChange={(e) => {
-                  setFullName(e.target.value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
-              />
-              <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
-            </div>
-          </div>
-
-          {/* STEP 2: PHONE NUMBER */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700">
-              2. Mobile Phone Number <span className="text-rose-500">*</span>
+              1. Mobile Phone Number <span className="text-rose-500">*</span>
             </label>
             
             <div className="relative">
@@ -220,22 +190,44 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
               )}
             </div>
 
-            {/* RETRIEVED CUSTOMER ADDRESS NOTICE */}
-            {existingAddress && (
-              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs font-semibold text-emerald-950 flex items-start gap-2 animate-in fade-in">
+            {/* RETRIEVED CUSTOMER ADDRESS NOTICE FROM SUPABASE */}
+            {existingCustomer && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl text-xs font-semibold text-emerald-950 flex items-start gap-2.5 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-extrabold block text-emerald-900">Welcome Back! Saved Address Found:</span>
-                  <span>{existingAddress.address_text}</span>
+                  <span className="font-extrabold block text-emerald-900">✓ Customer Record Found in Supabase!</span>
+                  <span>Name: <b>{existingCustomer.full_name}</b> {existingCustomer.address_text ? `• Location: ${existingCustomer.address_text}` : ''}</span>
                 </div>
               </div>
             )}
           </div>
 
+          {/* STEP 2: FULL NAME */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700">
+              2. Your Full Name <span className="text-rose-500">*</span>
+            </label>
+            
+            <div className="relative">
+              <input
+                type="text"
+                required
+                placeholder="Enter your name"
+                value={fullName}
+                onChange={(e) => {
+                  setFullName(e.target.value);
+                  if (errorMsg) setErrorMsg('');
+                }}
+                className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+            </div>
+          </div>
+
           {/* STEP 3: LOCATION SELECTION */}
           <div className="space-y-3 pt-2 border-t border-stone-100">
             <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700">
-              3. Select Delivery Location <span className="text-rose-500">*</span>
+              3. Delivery Location <span className="text-rose-500">*</span>
             </label>
 
             {/* DEVICE GPS LOCATION BUTTON */}

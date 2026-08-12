@@ -5,11 +5,17 @@ export async function createOrderInSupabase(orderData) {
   if (!isSupabaseConfigured) return orderData;
 
   try {
-    const customerPhone = orderData.customerPhone || orderData.phone || '+918123821300';
-    const customerName = orderData.customerName || orderData.name || 'Customer';
+    let savedPhone = '';
+    try { savedPhone = localStorage.getItem('gharsee_customer_phone') || ''; } catch {}
+    
+    let savedName = '';
+    try { savedName = localStorage.getItem('gharsee_customer_name') || ''; } catch {}
+
+    const customerPhone = orderData.customerPhone || orderData.phone || savedPhone;
+    const customerName = orderData.customerName || orderData.name || savedName || 'Customer';
     const deliveryAddress = orderData.address || orderData.delivery_address || 'Chikkamagaluru, Karnataka';
 
-    // 1. Insert row into orders table
+    // 1. Insert row into orders table with REAL customer_phone & customer_name
     const { data: insertedOrder, error: orderErr } = await supabase
       .from('orders')
       .insert([{
@@ -82,7 +88,7 @@ export async function fetchCustomerOrders(phone = null) {
       store_id: o.store_id,
       storeName: o.store_name || 'Local Store',
       customerName: o.customer_name || 'Customer',
-      customerPhone: o.customer_phone,
+      customerPhone: o.customer_phone || o.phone || '',
       date: o.created_at || new Date().toISOString(),
       deliveredAt: o.delivered_at,
       items: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
@@ -107,7 +113,7 @@ export async function fetchCustomerOrders(phone = null) {
   }
 }
 
-// Fetch Shopkeeper Orders strictly with customer_phone from Supabase
+// Fetch Shopkeeper Orders strictly with real customer_phone from Supabase
 export async function fetchShopkeeperOrders(shopId = null) {
   if (!isSupabaseConfigured) return [];
 
@@ -125,14 +131,14 @@ export async function fetchShopkeeperOrders(shopId = null) {
     if (error || !data) return [];
 
     return data.map(o => {
-      // Directly retrieve customer_phone from Supabase orders row
-      const phoneNum = o.customer_phone || o.phone;
+      // Directly retrieve real customer_phone from Supabase orders row
+      const phoneNum = o.customer_phone || o.phone || 'Phone not provided';
 
       return {
         id: o.id,
         customerName: o.customer_name || 'Customer',
-        customerPhone: phoneNum || '+91 81238 21300',
-        phone: phoneNum || '+91 81238 21300',
+        customerPhone: phoneNum,
+        phone: phoneNum,
         deliveryAddress: o.delivery_address || 'Chikkamagaluru, Karnataka',
         address: o.delivery_address || 'Chikkamagaluru, Karnataka',
         total: o.total_amount || 0,
@@ -174,7 +180,7 @@ export async function fetchRiderDeliveries() {
       storeName: o.store_name || (o.store_id ? 'Sri Lakshmi Stores' : 'Local Grocery Store'),
       storeAddress: 'Market Road, Chikkamagaluru',
       customerName: o.customer_name || 'Customer',
-      customerPhone: o.customer_phone || '+91 81238 21300',
+      customerPhone: o.customer_phone || o.phone || '',
       deliveryAddress: o.delivery_address || 'Chikkamagaluru, Karnataka',
       distance: '1.8 km',
       estimatedTime: '15-20 min',

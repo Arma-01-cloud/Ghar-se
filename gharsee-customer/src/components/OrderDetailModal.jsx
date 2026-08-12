@@ -1,11 +1,24 @@
 import React from 'react';
-import { X, CheckCircle2, Clock, MapPin, CreditCard, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle2, Clock, MapPin, CreditCard, ShieldCheck, Package, Truck, AlertCircle } from 'lucide-react';
 
 export default function OrderDetailModal({ order, onClose }) {
   if (!order) return null;
 
   const STATUS_STEPS = ['Order Placed', 'Confirmed', 'Packed', 'Out for Delivery', 'Delivered'];
-  const currentStepIndex = STATUS_STEPS.indexOf(order.status) !== -1 ? STATUS_STEPS.indexOf(order.status) : 3;
+
+  const getStepIndex = (statusStr) => {
+    const s = String(statusStr || 'pending').toLowerCase();
+    if (s === 'pending' || s === 'order placed' || s === 'order_placed') return 0;
+    if (s === 'accepted' || s === 'confirmed' || s === 'approved') return 1;
+    if (s === 'preparing' || s === 'packed' || s === 'ready') return 2;
+    if (s === 'picked_up' || s === 'out_for_delivery' || s === 'out for delivery' || s === 'dispatched') return 3;
+    if (s === 'delivered' || s === 'completed') return 4;
+    if (s === 'rejected' || s === 'cancelled') return -1;
+    return 0;
+  };
+
+  const currentStepIndex = getStepIndex(order.status);
+  const isRejected = currentStepIndex === -1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -34,50 +47,65 @@ export default function OrderDetailModal({ order, onClose }) {
             <div className="text-left sm:text-right">
               <span className="text-xs text-stone-400 block font-medium">Placed On</span>
               <span className="text-xs font-bold text-stone-800">
-                {new Date(order.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {new Date(order.date || order.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           </div>
         </div>
 
         {/* PROGRESS TRACKER TIMELINE */}
-        <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/80 space-y-3">
-          <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Delivery Status Timeline</h4>
-          
-          <div className="grid grid-cols-5 gap-1 relative pt-2">
-            {STATUS_STEPS.map((step, idx) => {
-              const isCompleted = idx <= currentStepIndex;
-              const isCurrent = idx === currentStepIndex;
-              return (
-                <div key={step} className="flex flex-col items-center text-center space-y-1.5 z-10">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold transition-colors ${
-                    isCompleted ? 'bg-emerald-700 text-white shadow-md' : 'bg-stone-200 text-stone-500'
-                  }`}>
-                    {isCompleted ? '✓' : idx + 1}
-                  </div>
-                  <span className={`text-[10px] font-bold leading-tight ${isCurrent ? 'text-emerald-800 font-black' : isCompleted ? 'text-stone-800' : 'text-stone-400'}`}>
-                    {step}
-                  </span>
-                </div>
-              );
-            })}
+        {isRejected ? (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 text-xs font-semibold flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            <div>
+              <span className="font-extrabold block text-rose-900 text-sm">Order Cancelled or Rejected</span>
+              <span>This order was cancelled by the store or customer. Please contact store for assistance.</span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Delivery Status Timeline</h4>
+              <span className="text-xs font-black text-emerald-800 uppercase bg-emerald-100 px-2.5 py-0.5 rounded-md">
+                Status: {order.status?.replace(/_/g, ' ') || 'Pending'}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-5 gap-1 relative pt-2">
+              {STATUS_STEPS.map((step, idx) => {
+                const isCompleted = idx <= currentStepIndex;
+                const isCurrent = idx === currentStepIndex;
+                return (
+                  <div key={step} className="flex flex-col items-center text-center space-y-1.5 z-10">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold transition-colors ${
+                      isCompleted ? 'bg-emerald-700 text-white shadow-md' : 'bg-stone-200 text-stone-500'
+                    }`}>
+                      {isCompleted ? '✓' : idx + 1}
+                    </div>
+                    <span className={`text-[10px] font-bold leading-tight ${isCurrent ? 'text-emerald-800 font-black underline' : isCompleted ? 'text-stone-800' : 'text-stone-400'}`}>
+                      {step}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ITEMS LIST */}
         <div className="space-y-3">
-          <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Grocery Items ({order.items.length})</h4>
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Grocery Items ({order.items?.length || 0})</h4>
           <div className="divide-y divide-stone-100 border border-stone-200 rounded-2xl p-3 bg-white space-y-2">
-            {order.items.map((item, idx) => (
+            {order.items?.map((item, idx) => (
               <div key={idx} className="flex items-center justify-between pt-2 first:pt-0">
                 <div className="flex items-center gap-3">
                   <img src={item.image || '/images/cat_veg_fruits.jpg'} alt="" className="w-10 h-10 object-cover rounded-xl bg-stone-100" />
                   <div>
                     <h5 className="font-extrabold text-xs text-stone-900">{item.name}</h5>
-                    <p className="text-[11px] text-stone-500">Qty: {item.quantity} ({item.unit || 'unit'})</p>
+                    <p className="text-[11px] text-stone-500">Qty: {item.quantity || item.qty} ({item.unit || 'unit'})</p>
                   </div>
                 </div>
-                <span className="font-extrabold text-sm text-stone-900">₹{item.price * item.quantity}</span>
+                <span className="font-extrabold text-sm text-stone-900">₹{(item.price || 0) * (item.quantity || item.qty || 1)}</span>
               </div>
             ))}
           </div>
@@ -89,15 +117,15 @@ export default function OrderDetailModal({ order, onClose }) {
             <span className="font-bold text-stone-600 block flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 text-emerald-700" /> Delivery Address
             </span>
-            <p className="text-stone-800 font-medium leading-relaxed">{order.address}</p>
+            <p className="text-stone-800 font-medium leading-relaxed">{order.address || order.deliveryAddress}</p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 space-y-1">
             <span className="font-bold text-stone-600 block flex items-center gap-1">
               <CreditCard className="w-3.5 h-3.5 text-emerald-700" /> Payment & Total
             </span>
-            <p className="text-stone-800 font-semibold">{order.paymentMethod}</p>
-            <p className="text-emerald-950 font-black text-lg pt-1">Total Paid: ₹{order.totalAmount}</p>
+            <p className="text-stone-800 font-semibold">{order.paymentMethod || 'Cash on Delivery'}</p>
+            <p className="text-emerald-950 font-black text-lg pt-1">Total Paid: ₹{order.totalAmount || order.total}</p>
           </div>
         </div>
 

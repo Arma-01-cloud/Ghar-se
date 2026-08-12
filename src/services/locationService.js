@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { get10DigitPhone } from './authService';
 
 // Calculate Geographic Distance using Haversine Formula (Returns distance in kilometers)
 export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -64,65 +65,91 @@ export function getCurrentPositionCoordinates() {
   });
 }
 
-// Fetch saved address for a customer by mobile phone number
+// Fetch saved customer address and profile from Supabase by 10-digit phone number
 export async function fetchCustomerAddressByPhone(phone) {
   if (!isSupabaseConfigured || !phone) return null;
 
   try {
-    const normalized = phone.replace(/\D/g, '');
-    const searchPhone = normalized.length === 10 ? `+91${normalized}` : (phone.startsWith('+') ? phone : `+${normalized}`);
+    const cleanDigits = get10DigitPhone(phone);
+    if (!cleanDigits || cleanDigits.length < 10) return null;
 
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .select('*')
-      .eq('phone', searchPhone)
-      .maybeSingle();
+    // 1. Fetch profiles table to see if user exists and get full_name
+    const { data: profiles } = await supabase.from('profiles').select('*');
+    const matchedProfile = (profiles || []).find(p => get10DigitPhone(p.phone) === cleanDigits);
 
-    if (error || !data) return null;
-    return data;
-  } catch {
+    // 2. Fetch customer_addresses table
+    const { data: addresses } = await supabase.from('customer_addresses').select('*');
+    const matchedAddress = (addresses || []).find(a => get10DigitPhone(a.phone) === cleanDigits);
+
+    if (matchedAddress || matchedProfile) {
+      return {
+        full_name: matchedAddress?.full_name || matchedProfile?.full_name || '',
+        phone: matchedAddress?.phone || matchedProfile?.phone || `+91${cleanDigits}`,
+        address_text: matchedAddress?.address_text || '',
+        city: matchedAddress?.city || 'Chikkamagaluru',
+        flat: matchedAddress?.flat || '',
+        street: matchedAddress?.street || '',
+        latitude: matchedAddress?.latitude ? parseFloat(matchedAddress.latitude) : 13.3161,
+        longitude: matchedAddress?.longitude ? parseFloat(matchedAddress.longitude) : 75.7720
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching customer profile/address by phone from Supabase:', err);
     return null;
   }
 }
 
-// Save or update customer address keyed by mobile phone number
-export async function saveCustomerPhoneAddress({ phone, fullName, flat, street, city = 'Bengaluru', pincode, latitude, longitude, addressText }) {
+// Save or update customer address and profile in Supabase
+export async function saveCustomerPhoneAddress({ phone, fullName, flat, street, city = 'Chikkamagaluru', pincode, latitude, longitude, addressText }) {
   if (!isSupabaseConfigured || !phone) return null;
 
   try {
-    const normalized = phone.replace(/\D/g, '');
-    const searchPhone = normalized.length === 10 ? `+91${normalized}` : (phone.startsWith('+') ? phone : `+${normalized}`);
+    const cleanDigits = get10DigitPhone(phone);
+    const normalized = `+91${cleanDigits}`;
+    const nameVal = fullName ? fullName.trim() : 'Customer';
 
-    // First ensure profile exists
+    // 1. Upsert profiles record
     await supabase.from('profiles').upsert({
-      phone: searchPhone,
+      phone: normalized,
       role: 'customer',
-      full_name: fullName || 'Customer'
+      full_name: nameVal
     }, { onConflict: 'phone' });
 
+    // 2. Check if customer_addresses record exists for this 10-digit phone
+    const { data: existingAddrs } = await supabase.from('customer_addresses').select('*');
+    const existing = (existingAddrs || []).find(a => get10DigitPhone(a.phone) === cleanDigits);
+
     const payload = {
-      phone: searchPhone,
-      full_name: fullName || 'Customer',
+      phone: normalized,
+      full_name: nameVal,
       flat: flat || '',
       street: street || '',
-      city: city || 'Bengaluru',
+      city: city || 'Chikkamagaluru',
       pincode: pincode || '',
-      latitude: latitude || 12.9784,
-      longitude: longitude || 77.6408,
+      latitude: latitude || 13.3161,
+      longitude: longitude || 75.7720,
       address_text: addressText || `${flat || ''} ${street || ''}, ${city}`.trim()
     };
 
-    const { data, error } = await supabase
-      .from('customer_addresses')
-      .upsert(payload, { onConflict: 'phone' })
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error saving customer address:', error);
-      return null;
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from('customer_addresses')
+        .update(payload)
+        .eq('id', existing.id)
+        .select()
+        .maybeSingle();
+      if (error) console.error('Error updating customer_addresses:', error);
+      return data || payload;
+    } else {
+      const { data, error } = await supabase
+        .from('customer_addresses')
+        .insert([payload])
+        .select()
+        .maybeSingle();
+      if (error) console.error('Error inserting customer_addresses:', error);
+      return data || payload;
     }
-    return data;
   } catch (err) {
     console.error('Exception saving customer address:', err);
     return null;
@@ -163,4 +190,3 @@ export async function saveUserAddress(addressRecord) {
     return null;
   }
 }
-

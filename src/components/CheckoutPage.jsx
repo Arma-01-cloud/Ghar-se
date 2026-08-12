@@ -1,18 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { MapPin, Clock, CreditCard, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function CheckoutPage() {
-  const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab, customerPhone } = useCart();
+  const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab, customerPhone, customerName, currentLocation } = useCart();
 
   const [address, setAddress] = useState({
-    fullName: 'Rahul Sharma',
-    phone: customerPhone || '+91 98765 43210',
-    flat: 'Flat 402, Green Meadows Apartment',
-    street: '100 Feet Road, Indiranagar',
-    city: 'Bengaluru',
-    pincode: '560038'
+    fullName: customerName && customerName !== 'Customer' ? customerName : '',
+    phone: customerPhone || '',
+    flat: currentLocation?.flat || '',
+    street: currentLocation?.street || currentLocation?.name || '',
+    city: currentLocation?.city || (currentLocation?.name?.includes(',') ? currentLocation.name.split(',')[1].trim() : 'Chikkamagaluru'),
+    pincode: currentLocation?.pincode || '577101'
   });
+
+  useEffect(() => {
+    if (customerName && customerName !== 'Customer') {
+      setAddress(prev => ({ ...prev, fullName: customerName }));
+    }
+    if (customerPhone) {
+      setAddress(prev => ({ ...prev, phone: customerPhone }));
+    }
+    if (currentLocation?.name) {
+      setAddress(prev => ({ ...prev, street: currentLocation.name }));
+    }
+  }, [customerName, customerPhone, currentLocation]);
 
   const [deliverySlot, setDeliverySlot] = useState('express'); // express, evening, tomorrow
   const [paymentMethod, setPaymentMethod] = useState('upi'); // upi, card, cod
@@ -22,8 +34,8 @@ export default function CheckoutPage() {
     return (
       <div className="py-20 text-center space-y-4">
         <h2 className="font-display text-2xl font-extrabold text-stone-900">Your cart is empty</h2>
-        <button onClick={() => setActiveTab('shop')} className="py-3 px-6 bg-emerald-800 text-white font-bold rounded-xl">
-          Return to Shop
+        <button onClick={() => setActiveTab('home')} className="py-3 px-6 bg-emerald-800 text-white font-bold rounded-xl">
+          Return to Home
         </button>
       </div>
     );
@@ -33,12 +45,12 @@ export default function CheckoutPage() {
 
   const handleCompleteCheckout = (e) => {
     e.preventDefault();
-    const formattedAddr = `${address.flat}, ${address.street}, ${address.city} - ${address.pincode}`;
+    const formattedAddr = `${address.flat ? address.flat + ', ' : ''}${address.street}, ${address.city} - ${address.pincode}`.trim();
     const paymentLabel = paymentMethod === 'upi' ? `UPI (${upiApp.toUpperCase()})` : paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery';
 
     placeOrder({
-      fullName: address.fullName,
-      phone: address.phone,
+      fullName: address.fullName || customerName || 'Customer',
+      phone: address.phone || customerPhone,
       subtotal: cartSubtotal,
       deliveryFee: deliveryFee,
       discount: 0,
@@ -49,208 +61,178 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="py-10 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
+      {/* HEADER */}
       <div className="border-b border-stone-200 pb-4">
-        <h1 className="font-display text-3xl font-extrabold text-stone-900">Order Checkout</h1>
-        <p className="text-stone-500 text-sm mt-0.5">Complete your grocery order delivery details below</p>
+        <h1 className="font-display text-3xl font-black text-stone-900 tracking-tight">Checkout Order</h1>
+        <p className="text-stone-500 text-sm">Review your delivery address and payment method</p>
       </div>
 
-      <form onSubmit={handleCompleteCheckout} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <form onSubmit={handleCompleteCheckout} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* LEFT COLUMN: ADDRESS, SLOT & PAYMENT */}
-        <div className="lg:col-span-8 space-y-6">
+        {/* LEFT COLUMN: ADDRESS & PAYMENT */}
+        <div className="lg:col-span-2 space-y-6">
           
-          {/* STEP 1: DELIVERY ADDRESS */}
+          {/* DELIVERY ADDRESS CARD */}
           <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-xs">
-            <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
-                1
-              </div>
-              <h2 className="font-display font-extrabold text-lg text-stone-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-700" /> Delivery Address
-              </h2>
+            <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-sm uppercase tracking-wider">
+              <MapPin className="w-5 h-5 text-emerald-700" />
+              <span>1. Delivery Address</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
               <div>
-                <label className="block text-xs font-bold text-stone-600 mb-1">Full Name</label>
+                <label className="block text-stone-700 font-bold mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
+                  placeholder="Enter full name"
                   value={address.fullName}
                   onChange={(e) => setAddress({ ...address, fullName: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-emerald-600"
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-600 mb-1">Phone Number</label>
+                <label className="block text-stone-700 font-bold mb-1">Mobile Phone Number *</label>
                 <input
                   type="text"
                   required
+                  placeholder="+91 81238 21300"
                   value={address.phone}
                   onChange={(e) => setAddress({ ...address, phone: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-emerald-600"
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-stone-600 mb-1">Flat / House / Building</label>
+                <label className="block text-stone-700 font-bold mb-1">Flat, House No., Building *</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Door No. 12, Main Road"
                   value={address.flat}
                   onChange={(e) => setAddress({ ...address, flat: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-emerald-600"
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-600 mb-1">Street / Area / Landmark</label>
+                <label className="block text-stone-700 font-bold mb-1">Street / Area / Landmark *</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Near Bus Stand, Chikkamagaluru"
                   value={address.street}
                   onChange={(e) => setAddress({ ...address, street: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-emerald-600"
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-600 mb-1">Pincode</label>
+                <label className="block text-stone-700 font-bold mb-1">City & Pincode *</label>
                 <input
                   type="text"
                   required
-                  value={address.pincode}
-                  onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-emerald-600"
+                  placeholder="Chikkamagaluru - 577101"
+                  value={`${address.city} - ${address.pincode}`}
+                  onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
             </div>
           </div>
 
-          {/* STEP 2: DELIVERY SLOT */}
+          {/* DELIVERY SLOT */}
           <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-xs">
-            <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
-                2
-              </div>
-              <h2 className="font-display font-extrabold text-lg text-stone-900 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-emerald-700" /> Select Delivery Slot
-              </h2>
+            <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-sm uppercase tracking-wider">
+              <Clock className="w-5 h-5 text-emerald-700" />
+              <span>2. Delivery Speed & Time</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { id: 'express', label: '⚡ Express (15-30 Mins)', sub: 'Fastest delivery option', tag: 'RECOMMENDED' },
-                { id: 'evening', label: '🌆 Today Evening (6 PM - 9 PM)', sub: 'Standard evening slot' },
-                { id: 'tomorrow', label: '🌅 Tomorrow Morning (8 AM - 11 AM)', sub: 'Scheduled morning' }
-              ].map(slot => (
-                <button
-                  key={slot.id}
-                  type="button"
-                  onClick={() => setDeliverySlot(slot.id)}
-                  className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                    deliverySlot === slot.id
-                      ? 'bg-emerald-50/80 border-emerald-600 ring-2 ring-emerald-500/20'
-                      : 'bg-white border-stone-200 hover:bg-stone-50'
-                  }`}
-                >
-                  <div>
-                    {slot.tag && (
-                      <span className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase mb-2 inline-block">
-                        {slot.tag}
-                      </span>
-                    )}
-                    <h4 className="font-bold text-xs sm:text-sm text-stone-900">{slot.label}</h4>
-                    <p className="text-[11px] text-stone-500 mt-1">{slot.sub}</p>
-                  </div>
-                  {deliverySlot === slot.id && (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-3 self-end" />
-                  )}
-                </button>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setDeliverySlot('express')}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  deliverySlot === 'express'
+                    ? 'bg-emerald-50 border-emerald-600 text-emerald-950 shadow-xs'
+                    : 'border-stone-200 hover:border-stone-300 text-stone-700'
+                }`}
+              >
+                <span className="block font-black text-emerald-800">🚀 Express 25 Mins</span>
+                <span className="text-[10px] text-stone-500 font-medium">Fastest doorstep delivery</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeliverySlot('evening')}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  deliverySlot === 'evening'
+                    ? 'bg-emerald-50 border-emerald-600 text-emerald-950 shadow-xs'
+                    : 'border-stone-200 hover:border-stone-300 text-stone-700'
+                }`}
+              >
+                <span className="block font-black text-stone-900">🌆 Today Evening</span>
+                <span className="text-[10px] text-stone-500 font-medium">Slot: 6:00 PM - 8:00 PM</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeliverySlot('tomorrow')}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  deliverySlot === 'tomorrow'
+                    ? 'bg-emerald-50 border-emerald-600 text-emerald-950 shadow-xs'
+                    : 'border-stone-200 hover:border-stone-300 text-stone-700'
+                }`}
+              >
+                <span className="block font-black text-stone-900">☀️ Tomorrow Morning</span>
+                <span className="text-[10px] text-stone-500 font-medium">Slot: 8:00 AM - 10:00 AM</span>
+              </button>
             </div>
           </div>
 
-          {/* STEP 3: PAYMENT METHOD */}
+          {/* PAYMENT METHOD */}
           <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-xs">
-            <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
-                3
-              </div>
-              <h2 className="font-display font-extrabold text-lg text-stone-900 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-emerald-700" /> Payment Method
-              </h2>
+            <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-sm uppercase tracking-wider">
+              <CreditCard className="w-5 h-5 text-emerald-700" />
+              <span>3. Payment Option</span>
             </div>
 
             <div className="space-y-3">
-              {/* UPI */}
-              <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                paymentMethod === 'upi' ? 'bg-emerald-50/80 border-emerald-600' : 'bg-white border-stone-200'
-              }`}>
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={paymentMethod === 'upi'}
-                  onChange={() => setPaymentMethod('upi')}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
-                />
-                <div className="flex-1">
-                  <span className="font-extrabold text-sm text-stone-900 block">UPI Instant Payment (GPay / PhonePe / Paytm / BHIM)</span>
-                  <p className="text-xs text-stone-500 mt-0.5">Pay safely via your favorite UPI app</p>
-                  
-                  {paymentMethod === 'upi' && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-emerald-200">
-                      {['gpay', 'phonepe', 'paytm', 'bhim'].map(app => (
-                        <button
-                          key={app}
-                          type="button"
-                          onClick={() => setUpiApp(app)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase border ${
-                            upiApp === app ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-stone-700 border-stone-300'
-                          }`}
-                        >
-                          {app}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              <label className="flex items-center justify-between p-4 rounded-2xl border border-stone-200 bg-stone-50 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="upi"
+                    checked={paymentMethod === 'upi'}
+                    onChange={() => setPaymentMethod('upi')}
+                    className="accent-emerald-700"
+                  />
+                  <div>
+                    <span className="font-extrabold text-stone-900 text-sm block">UPI (Google Pay / PhonePe / Paytm)</span>
+                    <span className="text-stone-500 text-xs font-semibold">Instant discount available</span>
+                  </div>
                 </div>
+                <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">RECOMMENDED</span>
               </label>
 
-              {/* CARD */}
-              <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                paymentMethod === 'card' ? 'bg-emerald-50/80 border-emerald-600' : 'bg-white border-stone-200'
-              }`}>
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={paymentMethod === 'card'}
-                  onChange={() => setPaymentMethod('card')}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
-                />
-                <div>
-                  <span className="font-extrabold text-sm text-stone-900 block">Credit / Debit Card</span>
-                  <p className="text-xs text-stone-500 mt-0.5">Visa, MasterCard, RuPay & American Express</p>
-                </div>
-              </label>
-
-              {/* CASH ON DELIVERY */}
-              <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                paymentMethod === 'cod' ? 'bg-emerald-50/80 border-emerald-600' : 'bg-white border-stone-200'
-              }`}>
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={paymentMethod === 'cod'}
-                  onChange={() => setPaymentMethod('cod')}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
-                />
-                <div>
-                  <span className="font-extrabold text-sm text-stone-900 block">Cash / UPI on Delivery</span>
-                  <p className="text-xs text-stone-500 mt-0.5">Pay at your doorstep when your groceries arrive</p>
+              <label className="flex items-center justify-between p-4 rounded-2xl border border-stone-200 bg-stone-50 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="cod"
+                    checked={paymentMethod === 'cod'}
+                    onChange={() => setPaymentMethod('cod')}
+                    className="accent-emerald-700"
+                  />
+                  <div>
+                    <span className="font-extrabold text-stone-900 text-sm block">Cash on Delivery (COD)</span>
+                    <span className="text-stone-500 text-xs font-semibold">Pay cash or scan QR code when rider arrives</span>
+                  </div>
                 </div>
               </label>
             </div>
@@ -258,58 +240,53 @@ export default function CheckoutPage() {
 
         </div>
 
-        {/* RIGHT COLUMN: ORDER SUMMARY SIDEBAR */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-6 shadow-sm sticky top-24">
-            
-            <h3 className="font-display font-extrabold text-xl text-stone-900 border-b border-stone-100 pb-3">
-              Order Items ({cart.length})
+        {/* RIGHT COLUMN: ORDER SUMMARY */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-stone-200 p-6 space-y-4 shadow-xs sticky top-28">
+            <h3 className="font-display font-extrabold text-lg text-stone-900 border-b border-stone-100 pb-3">
+              Order Summary ({cart.length} Items)
             </h3>
 
-            <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-              {cart.map(item => (
-                <div key={item.product.id} className="flex items-center justify-between text-xs font-semibold">
-                  <div className="flex items-center gap-2 truncate pr-2">
-                    <span className="font-black text-stone-900">{item.quantity}x</span>
-                    <span className="truncate text-stone-700">{item.product.name}</span>
-                  </div>
+            <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 text-xs">
+              {cart.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center font-semibold text-stone-800">
+                  <span className="truncate max-w-[170px]">{item.quantity}x {item.product.name}</span>
                   <span className="font-bold text-stone-900">₹{item.product.price * item.quantity}</span>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-2 border-t border-stone-100 pt-4 text-xs font-semibold text-stone-600">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
+            <div className="border-t border-stone-100 pt-3 space-y-2 text-xs font-semibold">
+              <div className="flex justify-between text-stone-600">
+                <span>Items Subtotal</span>
                 <span>₹{cartSubtotal}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Delivery Charge</span>
-                <span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span>
+              <div className="flex justify-between text-stone-600">
+                <span>Delivery Fee</span>
+                <span>{deliveryFee === 0 ? <span className="text-emerald-700 font-extrabold">FREE</span> : `₹${deliveryFee}`}</span>
               </div>
-              <div className="flex justify-between items-center text-lg font-black text-stone-900 border-t border-stone-200 pt-3">
-                <span>Grand Total</span>
-                <span className="text-xl text-emerald-950">₹{finalTotal}</span>
+              <div className="flex justify-between text-stone-900 font-extrabold text-base pt-2 border-t border-stone-100">
+                <span>Total Payable</span>
+                <span className="text-emerald-950">₹{finalTotal}</span>
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full py-4 px-6 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-emerald-900/20 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 mt-2"
             >
-              <span>PLACE GROCERY ORDER</span>
-              <ArrowRight className="w-5 h-5" />
+              <span>CONFIRM ORDER (₹{finalTotal})</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
 
-            <div className="text-center text-[11px] text-stone-400 font-semibold flex items-center justify-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Guaranteed Fresh & 100% Secure</span>
-            </div>
-
+            <p className="text-center text-[11px] text-stone-400 font-semibold flex items-center justify-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> 100% Safe & Secure Doorstep Grocery Delivery
+            </p>
           </div>
         </div>
 
       </form>
+
     </div>
   );
 }

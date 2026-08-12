@@ -13,8 +13,20 @@ export default function ShopkeeperOrderDetailModal() {
   if (!order) return null;
 
   const STATUS_STEPS = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'completed'];
-  const currentStepIndex = STATUS_STEPS.indexOf(order.status);
-  const phoneDisplay = order.customerPhone || order.phone || '+91 98765 43210';
+
+  const getShopkeeperStepIndex = (statusStr) => {
+    const s = String(statusStr || 'pending').toLowerCase();
+    if (s === 'pending' || s === 'order_placed') return 0;
+    if (s === 'accepted' || s === 'confirmed') return 1;
+    if (s === 'preparing' || s === 'packed') return 2;
+    if (s === 'ready') return 3;
+    if (s === 'picked_up' || s === 'out_for_delivery' || s === 'out for delivery') return 4;
+    if (s === 'delivered' || s === 'completed') return 5;
+    return 0;
+  };
+
+  const currentStepIndex = getShopkeeperStepIndex(order.status);
+  const phoneDisplay = order.customerPhone || order.phone || 'Phone not provided';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
@@ -39,13 +51,13 @@ export default function ShopkeeperOrderDetailModal() {
               </span>
             </div>
             <p className="text-stone-500 text-xs mt-1">
-              Received on {new Date(order.createdAt).toLocaleString('en-IN')}
+              Received on {new Date(order.createdAt || Date.now()).toLocaleString('en-IN')}
             </p>
           </div>
 
           <div className="text-right">
             <span className="text-[11px] text-stone-400 font-bold block uppercase">Grand Total</span>
-            <span className="font-black text-2xl text-emerald-950">₹{order.total}</span>
+            <span className="font-black text-2xl text-emerald-950">₹{order.total || order.totalAmount}</span>
           </div>
         </div>
 
@@ -64,7 +76,7 @@ export default function ShopkeeperOrderDetailModal() {
                   }`}>
                     {isDone ? '✓' : idx + 1}
                   </div>
-                  <span className={`text-[10px] font-bold capitalize leading-tight ${isCurrent ? 'text-emerald-900 font-black' : isDone ? 'text-stone-800' : 'text-stone-400'}`}>
+                  <span className={`text-[10px] font-bold capitalize leading-tight ${isCurrent ? 'text-emerald-900 font-black underline' : isDone ? 'text-stone-800' : 'text-stone-400'}`}>
                     {step.replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -88,22 +100,24 @@ export default function ShopkeeperOrderDetailModal() {
             </div>
             
             {/* CALL & WHATSAPP BUTTONS */}
-            <div className="flex items-center gap-2 pt-1">
-              <a
-                href={`tel:${phoneDisplay.replace(/\s+/g, '')}`}
-                className="py-1.5 px-3.5 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-colors shadow-xs"
-              >
-                📞 Call Customer
-              </a>
-              <a
-                href={`https://wa.me/${phoneDisplay.replace(/\D/g, '')}`}
-                target="_blank"
-                rel="noreferrer"
-                className="py-1.5 px-3.5 bg-green-500 hover:bg-green-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-colors shadow-xs"
-              >
-                💬 WhatsApp
-              </a>
-            </div>
+            {phoneDisplay !== 'Phone not provided' && (
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={`tel:${phoneDisplay.replace(/\s+/g, '')}`}
+                  className="py-1.5 px-3.5 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-colors shadow-xs"
+                >
+                  📞 Call Customer
+                </a>
+                <a
+                  href={`https://wa.me/${phoneDisplay.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-1.5 px-3.5 bg-green-500 hover:bg-green-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-colors shadow-xs"
+                >
+                  💬 WhatsApp
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-1.5">
@@ -119,13 +133,13 @@ export default function ShopkeeperOrderDetailModal() {
 
         {/* ITEMS BREAKDOWN TABLE */}
         <div className="space-y-3">
-          <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Order Items ({order.items.length})</h4>
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Order Items ({order.items?.length || 0})</h4>
           <div className="border border-stone-200 rounded-2xl overflow-hidden divide-y divide-stone-100 bg-white">
-            {order.items.map((item, idx) => (
+            {order.items?.map((item, idx) => (
               <div key={idx} className="p-3.5 flex items-center justify-between text-xs font-semibold">
                 <div className="space-y-0.5">
                   <h5 className="font-bold text-stone-900">{item.name}</h5>
-                  <p className="text-[11px] text-stone-400">Quantity: {item.qty || item.quantity} {item.unit} • ₹{item.price} each</p>
+                  <p className="text-[11px] text-stone-400">Quantity: {item.qty || item.quantity} {item.unit || 'unit'} • ₹{item.price} each</p>
                   
                   {/* REPLACEMENT PREFERENCE */}
                   <div className="text-[11px] font-bold text-stone-600 flex items-center gap-1 pt-0.5">
@@ -140,7 +154,7 @@ export default function ShopkeeperOrderDetailModal() {
 
                 <div className="text-right">
                   <span className="text-stone-500 mr-4 font-bold">{item.qty || item.quantity}x</span>
-                  <span className="font-black text-stone-900 text-sm">₹{item.price * (item.qty || item.quantity)}</span>
+                  <span className="font-black text-stone-900 text-sm">₹{(item.price || 0) * (item.qty || item.quantity || 1)}</span>
                 </div>
               </div>
             ))}
