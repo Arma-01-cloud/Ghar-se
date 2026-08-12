@@ -1,13 +1,13 @@
 export const INITIAL_RIDER_PROFILE = {
-  name: 'Arman Kumar',
-  phone: '+91 98765 00112',
-  email: 'arman.rider@gharsee.com',
-  rating: 4.8,
-  totalDeliveries: 248,
-  memberSince: 'March 2024',
-  vehicleType: 'Motorcycle',
-  vehicleNumber: 'KA-03-HA-8821',
-  drivingLicense: 'DL-IND-2022-99881',
-  city: 'Bengaluru, Karnataka',
+  name: 'Delivery Partner',
+  phone: '+91 81238 21300',
+  email: 'partner@gharsee.com',
+  rating: 5.0,
+  totalDeliveries: 0,
+  memberSince: 'Recently Joined',
+  vehicleType: 'Scooter',
+  vehicleNumber: 'Not specified',
+  drivingLicense: 'Not specified',
+  city: 'Chikkamagaluru, Karnataka',
   avatar: '/images/hero_grocery.jpg'
 };

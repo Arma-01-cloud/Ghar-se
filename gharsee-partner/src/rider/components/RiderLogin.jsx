@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useRider } from '../context/RiderContext';
-import { signUpUserWithPhone, signInUserWithPhone } from '../../services/authService';
-import { supabase } from '../../lib/supabase';
+import { signUpRiderInSupabase, signInRiderWithPhone } from '../../services/riderService';
 import { Bike, Phone, Lock, User, ArrowLeft, ArrowRight, Loader2, AlertCircle, ShieldCheck, MapPin } from 'lucide-react';
 
 export default function RiderLogin() {
@@ -20,7 +19,7 @@ export default function RiderLogin() {
   const [vehicleType, setVehicleType] = useState('scooter');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [drivingLicense, setDrivingLicense] = useState('');
-  const [deliveryCity, setDeliveryCity] = useState('Bengaluru');
+  const [deliveryCity, setDeliveryCity] = useState('Chikkamagaluru');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -50,39 +49,26 @@ export default function RiderLogin() {
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    // 1. Sign up user profile
-    const res = await signUpUserWithPhone({
+    // Register new rider directly in Supabase rider_profiles table
+    const res = await signUpRiderInSupabase({
       phone: phone.trim(),
       password,
       fullName: fullName.trim() || 'Delivery Partner',
-      role: 'rider'
+      vehicleType,
+      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+      drivingLicense: drivingLicense.trim().toUpperCase(),
+      deliveryCity
     });
 
-    if (res.error) {
-      setIsSubmitting(false);
-      setErrorMsg(res.error);
-      addRiderToast(res.error, 'error');
+    setIsSubmitting(false);
+
+    if (res.error || !res.user) {
+      setErrorMsg(res.error || 'Rider registration failed.');
+      addRiderToast(res.error || 'Registration failed.', 'error');
       return;
     }
 
-    // 2. Insert or update rider_profiles record with vehicle details
-    try {
-      await supabase.from('rider_profiles').upsert({
-        user_id: res.user.id,
-        full_name: fullName.trim(),
-        phone: res.user.phone,
-        vehicle_type: vehicleType,
-        vehicle_number: vehicleNumber.trim().toUpperCase(),
-        driving_license: drivingLicense.trim().toUpperCase(),
-        delivery_city: deliveryCity,
-        is_online: true
-      }, { onConflict: 'phone' });
-    } catch (err) {
-      console.error('Error saving rider vehicle details:', err);
-    }
-
-    setIsSubmitting(false);
-    addRiderToast('Rider account & vehicle details registered successfully! 🚴', 'success');
+    addRiderToast('Rider profile registered in Supabase successfully! 🚴', 'success');
     loginRider(res.user);
   };
 
@@ -93,14 +79,14 @@ export default function RiderLogin() {
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    const res = await signInUserWithPhone({
+    const res = await signInRiderWithPhone({
       phone: phone.trim(),
       password
     });
 
     setIsSubmitting(false);
 
-    if (res.error) {
+    if (res.error || !res.user) {
       setErrorMsg(res.error);
       addRiderToast(res.error, 'error');
     } else {
@@ -170,7 +156,7 @@ export default function RiderLogin() {
                 <input
                   type="text"
                   required
-                  placeholder="+91 98765 00112"
+                  placeholder="8123821300"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
@@ -241,7 +227,7 @@ export default function RiderLogin() {
                 <input
                   type="text"
                   required
-                  placeholder="+91 98765 00112"
+                  placeholder="8123821300"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
@@ -355,7 +341,7 @@ export default function RiderLogin() {
                 <input
                   type="text"
                   required
-                  placeholder="Bengaluru / Chikkamagaluru"
+                  placeholder="Chikkamagaluru / Bengaluru"
                   value={deliveryCity}
                   onChange={(e) => setDeliveryCity(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"

@@ -1,19 +1,19 @@
 export const INITIAL_RIDER_EARNINGS = {
-  today: 720,
-  todayDeliveries: 8,
-  todayDistanceKm: '34.6',
-  thisWeek: 4820,
-  thisMonth: 18640,
-  baseEarnings: 580,
-  bonuses: 100,
-  tips: 40,
+  today: 0,
+  todayDeliveries: 0,
+  todayDistanceKm: '0.0',
+  thisWeek: 0,
+  thisMonth: 0,
+  baseEarnings: 0,
+  bonuses: 0,
+  tips: 0,
   weeklyChart: [
-    { day: 'Mon', amount: 540 },
-    { day: 'Tue', amount: 720 },
-    { day: 'Wed', amount: 680 },
-    { day: 'Thu', amount: 810 },
-    { day: 'Fri', amount: 720 },
-    { day: 'Sat', amount: 950 },
-    { day: 'Sun', amount: 400 }
+    { day: 'Mon', amount: 0 },
+    { day: 'Tue', amount: 0 },
+    { day: 'Wed', amount: 0 },
+    { day: 'Thu', amount: 0 },
+    { day: 'Fri', amount: 0 },
+    { day: 'Sat', amount: 0 },
+    { day: 'Sun', amount: 0 }
   ]
 };
