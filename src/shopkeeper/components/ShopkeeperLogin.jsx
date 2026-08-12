@@ -17,7 +17,10 @@ export default function ShopkeeperLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!phone.trim() || !password) return;
+    if (!phone.trim() || !password) {
+      setErrorMsg('Please enter your mobile phone number and password.');
+      return;
+    }
 
     if (mode === 'signup' && password !== confirmPassword) {
       setErrorMsg('Passwords do not match. Please check and try again.');
@@ -37,9 +40,9 @@ export default function ShopkeeperLogin() {
 
       setIsSubmitting(false);
 
-      if (res.error) {
-        setErrorMsg(res.error);
-        addShopkeeperToast(res.error, 'error');
+      if (res.error || !res.user) {
+        setErrorMsg(res.error || 'Store partner registration failed.');
+        addShopkeeperToast(res.error || 'Registration failed.', 'error');
       } else {
         addShopkeeperToast('Store partner account created! Logging in...', 'success');
         loginShopkeeper(res.user);
@@ -52,9 +55,9 @@ export default function ShopkeeperLogin() {
 
       setIsSubmitting(false);
 
-      if (res.error) {
-        setErrorMsg(res.error);
-        addShopkeeperToast(res.error, 'error');
+      if (res.error || !res.user) {
+        setErrorMsg(res.error || 'Invalid mobile phone number or incorrect password.');
+        addShopkeeperToast(res.error || 'Login failed. Please check credentials.', 'error');
       } else {
         addShopkeeperToast('Welcome back to Store Partner Portal! 🎉', 'success');
         loginShopkeeper(res.user);
@@ -63,7 +66,7 @@ export default function ShopkeeperLogin() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#FBF9F5] p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen flex flex-col justify-between bg-[#FBF9F5] p-4 sm:p-6 lg:p-8 font-sans">
       
       {/* TOP BAR BACK LINK */}
       <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
@@ -103,9 +106,12 @@ export default function ShopkeeperLogin() {
 
         {/* ERROR BANNER */}
         {errorMsg && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-xs font-bold flex items-start gap-2.5 shadow-2xs">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-extrabold block text-rose-950">Authentication Error</span>
+              <span>{errorMsg}</span>
+            </div>
           </div>
         )}
 
@@ -123,7 +129,10 @@ export default function ShopkeeperLogin() {
                   required
                   placeholder="Ramesh Kumar"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
                 <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
@@ -139,9 +148,12 @@ export default function ShopkeeperLogin() {
               <input
                 type="text"
                 required
-                placeholder="+91 98765 43210"
+                placeholder="8123821300"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (errorMsg) setErrorMsg(null);
+                }}
                 className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
               />
               <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
@@ -158,7 +170,10 @@ export default function ShopkeeperLogin() {
                 required
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorMsg) setErrorMsg(null);
+                }}
                 className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
               />
               <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
@@ -176,7 +191,10 @@ export default function ShopkeeperLogin() {
                   required
                   placeholder="••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (errorMsg) setErrorMsg(null);
+                  }}
                   className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
                 <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />

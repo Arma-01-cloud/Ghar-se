@@ -22,11 +22,12 @@ import PromoBanner from './components/PromoBanner';
 import WhyUs from './components/WhyUs';
 import Footer from './components/Footer';
 import ToastContainer from './components/ToastContainer';
+import CustomerOnboardingModal from './components/CustomerOnboardingModal';
 import ShopkeeperLayout from './shopkeeper/components/ShopkeeperLayout';
 import RiderLayout from './rider/components/RiderLayout';
 
 function AppContent() {
-  const { activeTab } = useCart();
+  const { activeTab, isCustomerOnboardingOpen, setIsCustomerOnboardingOpen } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -46,8 +47,11 @@ function AppContent() {
     };
   }, []);
 
-  const isRiderRoute = currentPath.startsWith('/rider') || currentHash.includes('rider');
-  const isShopkeeperRoute = currentPath.startsWith('/shopkeeper') || currentHash.includes('shopkeeper');
+  const pathVal = currentPath || window.location.pathname || '';
+  const hashVal = currentHash || window.location.hash || '';
+
+  const isRiderRoute = pathVal.startsWith('/rider') || hashVal.includes('rider');
+  const isShopkeeperRoute = pathVal.startsWith('/shopkeeper') || hashVal.includes('shopkeeper');
 
   // RIDER APPLICATION PORTAL ROUTE
   if (isRiderRoute) {
@@ -127,6 +131,12 @@ function AppContent() {
 
       {/* SINGLE-STORE CART CONFLICT MODAL */}
       <StoreConflictModal />
+
+      {/* CUSTOMER PHONE & LOCATION ONBOARDING MODAL */}
+      <CustomerOnboardingModal
+        isOpen={isCustomerOnboardingOpen}
+        onClose={() => setIsCustomerOnboardingOpen(false)}
+      />
 
       {/* PRODUCT QUICK VIEW MODAL */}
       {quickViewProduct && (

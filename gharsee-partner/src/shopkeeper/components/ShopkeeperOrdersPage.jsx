@@ -4,7 +4,7 @@ import AcceptOrderModal from './AcceptOrderModal';
 import RejectOrderModal from './RejectOrderModal';
 import { 
   ShoppingBag, Search, SlidersHorizontal, Eye, CheckCircle2, 
-  AlertOctagon, Clock, ArrowRight, Play, CheckCheck, Truck, ShieldCheck 
+  AlertOctagon, Clock, ArrowRight, Play, CheckCheck, Truck, ShieldCheck, Phone 
 } from 'lucide-react';
 
 export default function ShopkeeperOrdersPage() {
@@ -31,7 +31,8 @@ export default function ShopkeeperOrdersPage() {
         const matchId = o.id.toLowerCase().includes(q);
         const matchCustomer = o.customerName.toLowerCase().includes(q);
         const matchAddress = o.deliveryAddress.toLowerCase().includes(q);
-        if (!matchId && !matchCustomer && !matchAddress) return false;
+        const matchPhone = (o.customerPhone || o.phone || '').includes(q);
+        if (!matchId && !matchCustomer && !matchAddress && !matchPhone) return false;
       }
 
       return true;
@@ -70,9 +71,9 @@ export default function ShopkeeperOrdersPage() {
         return (
           <button
             onClick={() => updateOrderStatus(order.id, 'ready')}
-            className="py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 shadow-xs"
+            className="py-2.5 px-5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md uppercase tracking-wider"
           >
-            <CheckCheck className="w-3.5 h-3.5" /> Mark Ready
+            <CheckCheck className="w-4 h-4" /> [ READY ] (Send to Rider)
           </button>
         );
       case 'ready':
@@ -120,7 +121,7 @@ export default function ShopkeeperOrdersPage() {
         <div className="relative md:w-80">
           <input
             type="text"
-            placeholder="Search by Order # or Customer..."
+            placeholder="Search by Order #, Customer or Phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white text-stone-900 text-sm pl-10 pr-4 py-2.5 rounded-2xl border border-stone-300 focus:outline-none focus:border-emerald-600 font-semibold"
@@ -163,6 +164,8 @@ export default function ShopkeeperOrdersPage() {
             const isRejected = order.status === 'rejected';
             const isCompleted = order.status === 'completed';
 
+            const phoneDisplay = order.customerPhone || order.phone || '+91 98765 43210';
+
             return (
               <div
                 key={order.id}
@@ -191,16 +194,43 @@ export default function ShopkeeperOrdersPage() {
 
                 {/* DETAILS SNAPSHOT */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center text-xs">
-                  <div className="sm:col-span-4">
-                    <span className="text-[10px] text-stone-400 font-bold uppercase block">Customer Details</span>
+                  
+                  {/* PROMINENT CUSTOMER PHONE & CONTACT INFO */}
+                  <div className="sm:col-span-4 space-y-1.5">
+                    <span className="text-[10px] text-emerald-800 font-black uppercase tracking-wider block">Customer Contact Info</span>
                     <p className="font-extrabold text-stone-900 text-sm">{order.customerName}</p>
-                    <p className="text-stone-500 font-medium">{order.phone}</p>
+                    
+                    <div className="bg-emerald-50 border border-emerald-300 px-2.5 py-1 rounded-xl w-fit">
+                      <span className="font-black text-emerald-950 text-xs flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                        <span className="text-stone-600">Phone:</span>
+                        <strong className="text-emerald-900 font-display font-black text-sm">{phoneDisplay}</strong>
+                      </span>
+                    </div>
+                    
+                    {/* CALL & WHATSAPP BUTTONS */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <a
+                        href={`tel:${phoneDisplay.replace(/\s+/g, '')}`}
+                        className="py-1 px-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-[11px] rounded-xl flex items-center gap-1 transition-colors shadow-xs"
+                      >
+                        📞 Call Customer
+                      </a>
+                      <a
+                        href={`https://wa.me/${phoneDisplay.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="py-1 px-2.5 bg-green-500 hover:bg-green-600 text-white font-extrabold text-[11px] rounded-xl flex items-center gap-1 transition-colors shadow-xs"
+                      >
+                        💬 WhatsApp
+                      </a>
+                    </div>
                   </div>
 
                   <div className="sm:col-span-5">
                     <span className="text-[10px] text-stone-400 font-bold uppercase block">Order Contents ({order.items.length} items)</span>
                     <p className="font-semibold text-stone-800 line-clamp-1">
-                      {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                      {order.items.map(i => `${i.qty || i.quantity}x ${i.name}`).join(', ')}
                     </p>
                     <p className="text-[11px] text-stone-400 truncate">{order.deliveryAddress}</p>
                   </div>

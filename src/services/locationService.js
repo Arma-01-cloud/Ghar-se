@@ -64,6 +64,71 @@ export function getCurrentPositionCoordinates() {
   });
 }
 
+// Fetch saved address for a customer by mobile phone number
+export async function fetchCustomerAddressByPhone(phone) {
+  if (!isSupabaseConfigured || !phone) return null;
+
+  try {
+    const normalized = phone.replace(/\D/g, '');
+    const searchPhone = normalized.length === 10 ? `+91${normalized}` : (phone.startsWith('+') ? phone : `+${normalized}`);
+
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('phone', searchPhone)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// Save or update customer address keyed by mobile phone number
+export async function saveCustomerPhoneAddress({ phone, fullName, flat, street, city = 'Bengaluru', pincode, latitude, longitude, addressText }) {
+  if (!isSupabaseConfigured || !phone) return null;
+
+  try {
+    const normalized = phone.replace(/\D/g, '');
+    const searchPhone = normalized.length === 10 ? `+91${normalized}` : (phone.startsWith('+') ? phone : `+${normalized}`);
+
+    // First ensure profile exists
+    await supabase.from('profiles').upsert({
+      phone: searchPhone,
+      role: 'customer',
+      full_name: fullName || 'Customer'
+    }, { onConflict: 'phone' });
+
+    const payload = {
+      phone: searchPhone,
+      full_name: fullName || 'Customer',
+      flat: flat || '',
+      street: street || '',
+      city: city || 'Bengaluru',
+      pincode: pincode || '',
+      latitude: latitude || 12.9784,
+      longitude: longitude || 77.6408,
+      address_text: addressText || `${flat || ''} ${street || ''}, ${city}`.trim()
+    };
+
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .upsert(payload, { onConflict: 'phone' })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error saving customer address:', error);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error('Exception saving customer address:', err);
+    return null;
+  }
+}
+
 // Fetch saved addresses from Supabase addresses table
 export async function fetchSavedAddresses(userId) {
   if (!isSupabaseConfigured || !userId) return [];
@@ -98,3 +163,4 @@ export async function saveUserAddress(addressRecord) {
     return null;
   }
 }
+

@@ -5,24 +5,27 @@ export async function createOrderInSupabase(orderData) {
   if (!isSupabaseConfigured) return orderData;
 
   try {
-    const { data: user } = await supabase.auth.getUser();
-    const userId = user?.user?.id || null;
+    const customerPhone = orderData.customerPhone || orderData.phone || '+918123821300';
+    const customerName = orderData.customerName || orderData.name || 'Customer';
+    const deliveryAddress = orderData.address || orderData.delivery_address || 'Chikkamagaluru, Karnataka';
 
     // 1. Insert row into orders table
     const { data: insertedOrder, error: orderErr } = await supabase
       .from('orders')
       .insert([{
         id: orderData.id,
-        user_id: userId,
         store_id: orderData.store_id || null,
+        store_name: orderData.storeName || orderData.store_name || 'Local Grocery Store',
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        delivery_address: deliveryAddress,
         fulfillment_mode: orderData.fulfillment_mode || 'store_selected',
-        status: orderData.status || 'Order Placed',
+        status: orderData.status || 'pending',
         total_amount: orderData.totalAmount || orderData.total_amount || 0,
         subtotal: orderData.subtotal || 0,
         delivery_fee: orderData.deliveryFee || orderData.delivery_fee || 0,
-        payment_method: orderData.paymentMethod || 'UPI',
-        delivery_address: orderData.address || 'Default Address',
-        items_summary: JSON.stringify(orderData.items || [])
+        payment_method: orderData.paymentMethod || 'Cash on Delivery',
+        items: orderData.items || []
       }])
       .select()
       .single();
@@ -36,11 +39,12 @@ export async function createOrderInSupabase(orderData) {
     if (orderData.items && orderData.items.length > 0) {
       const itemRows = orderData.items.map(item => ({
         order_id: insertedOrder.id,
-        product_id: item.id || null,
-        product_name: item.name,
-        quantity: item.quantity || 1,
+        product_id: (item.id && typeof item.id === 'string' && item.id.length > 20) ? item.id : null,
+        product_name: item.name || item.itemName || 'Grocery Item',
+        quantity: item.quantity || item.qty || 1,
         price: item.price || 0,
-        unit: item.unit || '1 unit'
+        unit: item.unit || item.quantityUnit || '1 kg',
+        replacement_preference: item.replacementPreference || 'replace_brand'
       }));
 
       await supabase.from('order_items').insert(itemRows);
@@ -54,36 +58,48 @@ export async function createOrderInSupabase(orderData) {
 }
 
 // Fetch Customer Orders from Supabase
-export async function fetchCustomerOrders() {
+export async function fetchCustomerOrders(phone = null) {
   if (!isSupabaseConfigured) return [];
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('orders')
       .select('*, order_items(*)')
       .order('created_at', { ascending: false });
 
+    if (phone) {
+      const cleanDigits = phone.replace(/\D/g, '');
+      const searchPhone = cleanDigits.length === 10 ? `+91${cleanDigits}` : phone;
+      query = query.or(`customer_phone.eq.${searchPhone},customer_phone.eq.${phone}`);
+    }
+
+    const { data, error } = await query;
     if (error || !data) return [];
 
     return data.map(o => ({
       id: o.id,
       fulfillment_mode: o.fulfillment_mode || 'store_selected',
       store_id: o.store_id,
-      storeName: o.store_id ? 'Local Store' : 'Store Selection Pending (Rider Will Select)',
+      storeName: o.store_name || 'Local Store',
+      customerName: o.customer_name || 'Customer',
+      customerPhone: o.customer_phone,
       date: o.created_at || new Date().toISOString(),
+      deliveredAt: o.delivered_at,
       items: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
         id: i.product_id || i.id,
-        name: i.product_name || i.name || 'Item',
+        name: i.product_name,
         price: i.price || 0,
         quantity: i.quantity || 1,
+        qty: i.quantity || 1,
         unit: i.unit || '1 unit',
+        replacementPreference: i.replacement_preference || 'replace_brand',
         image: '/images/cat_veg_fruits.jpg'
-      })) : (JSON.parse(o.items_summary || '[]')),
+      })) : (Array.isArray(o.items) ? o.items : []),
       subtotal: o.subtotal || o.total_amount || 0,
       deliveryFee: o.delivery_fee || 0,
       totalAmount: o.total_amount || 0,
-      status: o.status || 'Order Placed',
-      paymentMethod: o.payment_method || 'UPI',
+      status: o.status || 'pending',
+      paymentMethod: o.payment_method || 'Cash on Delivery',
       address: o.delivery_address || 'Customer Address'
     }));
   } catch {
@@ -91,7 +107,7 @@ export async function fetchCustomerOrders() {
   }
 }
 
-// Fetch Shopkeeper Orders from Supabase
+// Fetch Shopkeeper Orders strictly with customer_phone from Supabase
 export async function fetchShopkeeperOrders(shopId = null) {
   if (!isSupabaseConfigured) return [];
 
@@ -108,23 +124,34 @@ export async function fetchShopkeeperOrders(shopId = null) {
     const { data, error } = await query;
     if (error || !data) return [];
 
-    return data.map(o => ({
-      id: o.id,
-      customerName: 'Customer',
-      customerPhone: '+919876543210',
-      address: o.delivery_address || 'Indiranagar, Bengaluru',
-      total: o.total_amount || 0,
-      status: (o.status || 'pending').toLowerCase(),
-      fulfillment_mode: o.fulfillment_mode || 'store_selected',
-      createdAt: o.created_at || new Date().toISOString(),
-      items: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
-        id: i.product_id || i.id,
-        name: i.product_name || 'Item',
-        quantity: i.quantity || 1,
-        unit: i.unit || '1 unit',
-        price: i.price || 0
-      })) : (JSON.parse(o.items_summary || '[]'))
-    }));
+    return data.map(o => {
+      // Directly retrieve customer_phone from Supabase orders row
+      const phoneNum = o.customer_phone || o.phone;
+
+      return {
+        id: o.id,
+        customerName: o.customer_name || 'Customer',
+        customerPhone: phoneNum || '+91 81238 21300',
+        phone: phoneNum || '+91 81238 21300',
+        deliveryAddress: o.delivery_address || 'Chikkamagaluru, Karnataka',
+        address: o.delivery_address || 'Chikkamagaluru, Karnataka',
+        total: o.total_amount || 0,
+        status: (o.status || 'pending').toLowerCase(),
+        fulfillment_mode: o.fulfillment_mode || 'store_selected',
+        createdAt: o.created_at || new Date().toISOString(),
+        paymentStatus: o.payment_status || 'Paid',
+        deliveryType: o.payment_method || 'Cash on Delivery',
+        items: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
+          id: i.product_id || i.id,
+          name: i.product_name,
+          quantity: i.quantity || 1,
+          qty: i.quantity || 1,
+          unit: i.unit || '1 unit',
+          price: i.price || 0,
+          replacementPreference: i.replacement_preference || 'replace_brand'
+        })) : (Array.isArray(o.items) ? o.items : [])
+      };
+    });
   } catch {
     return [];
   }
@@ -144,24 +171,24 @@ export async function fetchRiderDeliveries() {
 
     const formattedOrders = data.map(o => ({
       id: o.id,
-      storeName: o.store_id ? 'Sri Lakshmi Stores' : 'Store Selection Pending',
-      storeAddress: 'Indiranagar, Bengaluru',
-      customerName: 'Rahul K.',
-      customerPhone: '+919876543210',
-      deliveryAddress: o.delivery_address || 'Indiranagar, Bengaluru',
-      distance: '2.1 km',
+      storeName: o.store_name || (o.store_id ? 'Sri Lakshmi Stores' : 'Local Grocery Store'),
+      storeAddress: 'Market Road, Chikkamagaluru',
+      customerName: o.customer_name || 'Customer',
+      customerPhone: o.customer_phone || '+91 81238 21300',
+      deliveryAddress: o.delivery_address || 'Chikkamagaluru, Karnataka',
+      distance: '1.8 km',
       estimatedTime: '15-20 min',
-      itemCount: o.order_items?.length || 3,
-      items: o.order_items?.map(i => `${i.product_name} (${i.quantity} ${i.unit})`) || ['Basmati Rice', 'Milk'],
+      itemCount: o.order_items?.length || (Array.isArray(o.items) ? o.items.length : 3),
+      items: o.order_items?.map(i => `${i.product_name} (${i.quantity} ${i.unit})`) || ['Grocery Items'],
       estimatedEarnings: 65,
       paymentStatus: o.payment_method || 'Paid Online',
       status: o.status || 'pending',
       fulfillment_mode: o.fulfillment_mode || 'store_selected'
     }));
 
-    const incoming = formattedOrders.find(o => o.status === 'Order Placed' || o.status === 'SEARCHING_FOR_STORE' || o.status === 'pending') || null;
-    const active = formattedOrders.find(o => o.status === 'accepted' || o.status === 'preparing' || o.status === 'out_for_delivery') || null;
-    const history = formattedOrders.filter(o => o.status === 'delivered' || o.status === 'Delivered');
+    const incoming = formattedOrders.find(o => o.status === 'ready' || o.status === 'READY') || null;
+    const active = formattedOrders.find(o => o.status === 'accepted' || o.status === 'picked_up' || o.status === 'out_for_delivery') || null;
+    const history = formattedOrders.filter(o => o.status === 'delivered' || o.status === 'completed');
 
     return { incoming, active, history };
   } catch {
@@ -169,14 +196,22 @@ export async function fetchRiderDeliveries() {
   }
 }
 
-// Update Order Status in Supabase
-export async function updateOrderStatusInSupabase(orderId, newStatus) {
+// Update Order Status in Supabase with timestamp support
+export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = null) {
   if (!isSupabaseConfigured) return true;
 
   try {
+    const updateData = { status: newStatus };
+    if (riderId) {
+      updateData.rider_id = riderId;
+    }
+    if (newStatus === 'delivered' || newStatus === 'completed') {
+      updateData.delivered_at = new Date().toISOString();
+    }
+
     const { error } = await supabase
       .from('orders')
-      .update({ status: newStatus })
+      .update(updateData)
       .eq('id', orderId);
 
     return !error;

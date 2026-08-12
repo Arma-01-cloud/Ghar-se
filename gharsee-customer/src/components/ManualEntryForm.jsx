@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { SUGGESTED_QUICK_ITEMS } from '../data/products';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles, RefreshCw, XCircle } from 'lucide-react';
 
 export default function ManualEntryForm({ onAddItem }) {
   const [itemName, setItemName] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [unit, setUnit] = useState('kg');
+  const [outOfStockAction, setOutOfStockAction] = useState('replace'); // 'replace' or 'cancel'
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -13,7 +14,8 @@ export default function ManualEntryForm({ onAddItem }) {
     onAddItem({
       name: itemName.trim(),
       qty: parseFloat(quantity) || 1,
-      unit: unit
+      unit: unit,
+      outOfStockAction: outOfStockAction
     });
     setItemName('');
     setQuantity(1);
@@ -23,20 +25,36 @@ export default function ManualEntryForm({ onAddItem }) {
     onAddItem({
       name: suggested.name,
       qty: suggested.defaultQty || 1,
-      unit: suggested.unit || 'kg'
+      unit: suggested.unit || 'kg',
+      outOfStockAction: outOfStockAction
     });
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-5 h-5 text-emerald-600" />
-        <h3 className="font-display font-extrabold text-lg text-stone-900">
-          Manual Grocery Entry
-        </h3>
+    <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-emerald-600" />
+          <h3 className="font-display font-extrabold text-lg text-stone-900">
+            Manual Grocery Entry
+          </h3>
+        </div>
+
+        {/* OUT OF STOCK ITEM CHOICE DROPDOWN */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="font-bold text-stone-500 hidden sm:inline">If item is out of stock:</span>
+          <select
+            value={outOfStockAction}
+            onChange={(e) => setOutOfStockAction(e.target.value)}
+            className="bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs font-extrabold rounded-xl px-2.5 py-1.5 focus:outline-none"
+          >
+            <option value="replace">🔄 Replace with other brand</option>
+            <option value="cancel">❌ Cancel the item</option>
+          </select>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-3 mb-6">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
         <div className="sm:col-span-6">
           <label className="block text-xs font-bold text-stone-600 mb-1">Item Name</label>
           <input

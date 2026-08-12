@@ -1,9 +1,16 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
-import { Leaf, Send, Phone, Mail, MapPin } from 'lucide-react';
+import { Leaf, Send, Phone, MapPin } from 'lucide-react';
 
 export default function Footer() {
   const { setActiveTab } = useCart();
+
+  const phoneNumbers = [
+    '+91 81238 21300',
+    '+91 77600 32354',
+    '+91 91080 22641',
+    '+91 86601 20584'
+  ];
 
   return (
     <footer className="bg-[#08241B] text-stone-300 pt-16 pb-20 md:pb-12 border-t border-emerald-950">
@@ -27,18 +34,27 @@ export default function Footer() {
               Your daily local grocery commerce platform. Shop farm-fresh fruits, vegetables, and pantry staples or upload your handwritten grocery shopping list to convert it into a live cart in seconds.
             </p>
 
-            <div className="space-y-2 text-xs text-emerald-200/80 pt-1">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Indiranagar Darkstore #4, Bengaluru, India</span>
+            <div className="space-y-2.5 text-xs text-emerald-200/90 pt-2">
+              <div className="flex items-start gap-2.5">
+                <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="font-bold">Chikkamagaluru, Karnataka, India</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>+91 (080) 4920 8800 (24x7 Support)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>support@gharseefresh.com</span>
+              
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center gap-2 text-emerald-400 font-extrabold uppercase tracking-wider text-[10px]">
+                  <Phone className="w-3.5 h-3.5" /> 24x7 Customer Support Hotline
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                  {phoneNumbers.map((num, idx) => (
+                    <a
+                      key={idx}
+                      href={`tel:${num.replace(/\s+/g, '')}`}
+                      className="bg-emerald-950/60 border border-emerald-800/80 hover:border-emerald-500 hover:bg-emerald-900 text-white font-extrabold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 w-fit"
+                    >
+                      <span className="text-emerald-400">📞</span> {num}
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

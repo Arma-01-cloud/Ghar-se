@@ -14,6 +14,7 @@ export default function ShopkeeperOrderDetailModal() {
 
   const STATUS_STEPS = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'completed'];
   const currentStepIndex = STATUS_STEPS.indexOf(order.status);
+  const phoneDisplay = order.customerPhone || order.phone || '+91 98765 43210';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
@@ -74,21 +75,44 @@ export default function ShopkeeperOrderDetailModal() {
 
         {/* CUSTOMER & DELIVERY INFO */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-1.5">
+          <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-2">
             <span className="font-extrabold uppercase tracking-wider text-stone-500 block">Customer Information</span>
             <h5 className="font-black text-stone-900 text-sm">{order.customerName}</h5>
-            <p className="text-stone-600 font-semibold flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5 text-emerald-700" /> {order.phone}
-            </p>
+            
+            <div className="bg-emerald-100/80 border border-emerald-300 px-3 py-1.5 rounded-xl w-fit">
+              <p className="text-emerald-950 font-black text-xs flex items-center gap-1.5">
+                <Phone className="w-4 h-4 text-emerald-800 shrink-0" />
+                <span>Customer Phone:</span>
+                <strong className="text-emerald-900 font-display font-black text-sm">{phoneDisplay}</strong>
+              </p>
+            </div>
+            
+            {/* CALL & WHATSAPP BUTTONS */}
+            <div className="flex items-center gap-2 pt-1">
+              <a
+                href={`tel:${phoneDisplay.replace(/\s+/g, '')}`}
+                className="py-1.5 px-3.5 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-colors shadow-xs"
+              >
+                📞 Call Customer
+              </a>
+              <a
+                href={`https://wa.me/${phoneDisplay.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="py-1.5 px-3.5 bg-green-500 hover:bg-green-600 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-colors shadow-xs"
+              >
+                💬 WhatsApp
+              </a>
+            </div>
           </div>
 
           <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-1.5">
-            <span className="font-extrabold uppercase tracking-wider text-stone-500 block">Delivery & Payment</span>
+            <span className="font-extrabold uppercase tracking-wider text-stone-500 block">Delivery Address Snapshot & Payment</span>
             <p className="text-stone-800 font-semibold flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-emerald-700" /> {order.deliveryAddress}
+              <MapPin className="w-3.5 h-3.5 text-emerald-700" /> {order.deliveryAddress || order.address}
             </p>
             <p className="text-emerald-700 font-extrabold flex items-center gap-1">
-              <CreditCard className="w-3.5 h-3.5" /> {order.paymentStatus} ({order.deliveryType})
+              <CreditCard className="w-3.5 h-3.5" /> {order.paymentStatus || 'Paid'} ({order.deliveryType || 'Standard'})
             </p>
           </div>
         </div>
@@ -99,13 +123,24 @@ export default function ShopkeeperOrderDetailModal() {
           <div className="border border-stone-200 rounded-2xl overflow-hidden divide-y divide-stone-100 bg-white">
             {order.items.map((item, idx) => (
               <div key={idx} className="p-3.5 flex items-center justify-between text-xs font-semibold">
-                <div>
+                <div className="space-y-0.5">
                   <h5 className="font-bold text-stone-900">{item.name}</h5>
-                  <p className="text-[11px] text-stone-400">Unit: {item.unit} • ₹{item.price} each</p>
+                  <p className="text-[11px] text-stone-400">Quantity: {item.qty || item.quantity} {item.unit} • ₹{item.price} each</p>
+                  
+                  {/* REPLACEMENT PREFERENCE */}
+                  <div className="text-[11px] font-bold text-stone-600 flex items-center gap-1 pt-0.5">
+                    <span className="text-stone-400">If Unavailable:</span>
+                    <span className={`px-2 py-0.5 rounded-md ${
+                      item.replacementPreference === 'cancel_item' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    }`}>
+                      {item.replacementPreference === 'cancel_item' ? '❌ Cancel Item' : '🔄 Replace with another brand'}
+                    </span>
+                  </div>
                 </div>
+
                 <div className="text-right">
-                  <span className="text-stone-500 mr-4 font-bold">{item.qty}x</span>
-                  <span className="font-black text-stone-900 text-sm">₹{item.price * item.qty}</span>
+                  <span className="text-stone-500 mr-4 font-bold">{item.qty || item.quantity}x</span>
+                  <span className="font-black text-stone-900 text-sm">₹{item.price * (item.qty || item.quantity)}</span>
                 </div>
               </div>
             ))}
@@ -146,9 +181,9 @@ export default function ShopkeeperOrderDetailModal() {
             {order.status === 'preparing' && (
               <button
                 onClick={() => updateOrderStatus(order.id, 'ready')}
-                className="py-2.5 px-5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5"
+                className="py-2.5 px-6 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center gap-2 uppercase tracking-wider"
               >
-                <CheckCheck className="w-4 h-4" /> Mark Order Ready
+                <CheckCheck className="w-4 h-4" /> [ READY ] (Send to Rider)
               </button>
             )}
 

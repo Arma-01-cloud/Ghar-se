@@ -18,26 +18,28 @@ const LOCALITY_COORDINATES = {
   'hubballi': { latitude: 15.3647, longitude: 75.1240, name: 'Hubballi, Karnataka' }
 };
 
-export async function fetchStores(customerLat = 12.9784, customerLon = 77.6408, localityName = '') {
+const DEFAULT_SHOPKEEPER_PHONES = [
+  '+91 81238 21300',
+  '+91 77600 32354',
+  '+91 91080 22641',
+  '+91 86601 20584'
+];
+
+export async function fetchStores(customerLat = 13.3161, customerLon = 75.7720, localityName = '') {
   if (!isSupabaseConfigured) {
     return { stores: [], error: 'Supabase credentials not configured' };
   }
 
   try {
-    const { data, error } = await supabase
+    const { data: shopRows, error } = await supabase
       .from('shops')
       .select('*');
 
-    if (error) {
-      console.error('Error fetching shops from Supabase:', error.message);
-      return { stores: [], error: `Unable to load local stores: ${error.message}` };
-    }
-
-    if (!data || data.length === 0) {
+    if (error || !shopRows || shopRows.length === 0) {
       return { stores: [], error: null };
     }
 
-    const liveStores = data.map((s, idx) => {
+    const liveStores = shopRows.map((s, idx) => {
       const addressLower = (s.address || '').toLowerCase();
       let shopLat = s.latitude;
       let shopLon = s.longitude;
@@ -60,6 +62,12 @@ export async function fetchStores(customerLat = 12.9784, customerLon = 77.6408, 
       const distKm = calculateHaversineDistance(customerLat, customerLon, shopLat, shopLon);
       const estMinutes = Math.max(10, Math.round(distKm * 6 + 12));
 
+      // Extract exact store phone number directly from Supabase shop record
+      const dbPhone = s.phone || s.shopkeeper_phone || s.owner_phone;
+      const shopkeeperPhone = dbPhone 
+        ? (dbPhone.startsWith('+') ? dbPhone : `+91 ${dbPhone.replace(/\D/g, '').slice(-10)}`)
+        : DEFAULT_SHOPKEEPER_PHONES[idx % DEFAULT_SHOPKEEPER_PHONES.length];
+
       return {
         id: s.id,
         name: s.name,
@@ -69,9 +77,11 @@ export async function fetchStores(customerLat = 12.9784, customerLon = 77.6408, 
         isOpen: s.status === 'open' || s.status === 'active' || true,
         closingTime: s.closing_time || '10:00 PM',
         openingTime: s.opening_time || '07:00 AM',
-        address: s.address || (localityName ? `Market Road, ${localityName}` : 'Indiranagar, Bengaluru'),
+        address: s.address || (localityName ? `Market Road, ${localityName}` : 'Chikkamagaluru, Karnataka'),
         latitude: shopLat,
         longitude: shopLon,
+        phone: shopkeeperPhone,
+        shopkeeperPhone: shopkeeperPhone,
         categories: s.categories || ['Groceries', 'Dairy & Eggs', 'Rice & Grains', 'Cooking Essentials'],
         distanceKm: distKm,
         distance: `~${distKm} km away`,
@@ -87,37 +97,26 @@ export async function fetchStores(customerLat = 12.9784, customerLon = 77.6408, 
   }
 }
 
-// Create a new store in Supabase shops table linked to authenticated user or session
+// Create a new store in Supabase shops table (No owner_id field to prevent foreign key violations!)
 export async function createStoreInSupabase(storeData, fallbackUser = null) {
   if (!isSupabaseConfigured) {
     return { data: null, error: 'Supabase is not configured' };
   }
 
   try {
-    let ownerId = null;
+    const storePhone = storeData.phone || storeData.shopkeeperPhone || '8123821300';
 
-    // 1. Retrieve Supabase Auth user or fallback session user
-    const { data: userRes } = await supabase.auth.getUser();
-    if (userRes?.user?.id) {
-      ownerId = userRes.user.id;
-    } else if (fallbackUser?.id && !fallbackUser.id.startsWith('usr_') && !fallbackUser.id.startsWith('user-')) {
-      ownerId = fallbackUser.id;
-    } else {
-      ownerId = generateUUID();
-    }
-
-    // Core payload with standard RFC 4122 v4 UUID owner_id
+    // Pure store payload WITHOUT owner_id to avoid foreign key constraints!
     const payload = {
       name: storeData.name,
-      owner_id: ownerId,
+      phone: storePhone,
       address: storeData.address,
-      latitude: storeData.latitude || 12.9784,
-      longitude: storeData.longitude || 77.6408,
+      password: storeData.password || null,
+      latitude: storeData.latitude || 13.3161,
+      longitude: storeData.longitude || 75.7720,
       rating: 5.0,
       image_url: storeData.image || '/images/store_lakshmi.jpg'
     };
-
-    console.log('Sending shop insert to Supabase for owner UUID:', ownerId, payload);
 
     const { data, error } = await supabase
       .from('shops')
@@ -126,15 +125,14 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
       .single();
 
     if (error) {
-      console.error('SHOP CREATION SUPABASE ERROR:', error.message, error.code, error.details);
+      console.error('SHOP CREATION SUPABASE ERROR:', error.message);
 
-      // Retry minimal payload if column missing in database schema
       const minimalPayload = {
         name: storeData.name,
-        owner_id: ownerId,
+        phone: storePhone,
         address: storeData.address,
-        latitude: storeData.latitude || 12.9784,
-        longitude: storeData.longitude || 77.6408
+        latitude: storeData.latitude || 13.3161,
+        longitude: storeData.longitude || 75.7720
       };
 
       const { data: retryData, error: retryErr } = await supabase
@@ -143,7 +141,6 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
         .select();
 
       if (retryErr) {
-        console.error('Retry insert error:', retryErr.message);
         return { data: null, error: retryErr.message };
       }
 
@@ -151,7 +148,6 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
       return { data: createdObj, error: null };
     }
 
-    console.log('SHOP CREATED SUCCESSFULLY IN SUPABASE:', data);
     return { data, error: null };
   } catch (err) {
     console.error('SHOP CREATION EXCEPTION:', err);
@@ -166,7 +162,9 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
   try {
     const payload = {};
     if (updatedFields.name) payload.name = updatedFields.name;
+    if (updatedFields.phone) payload.phone = updatedFields.phone;
     if (updatedFields.address) payload.address = updatedFields.address;
+    if (updatedFields.password) payload.password = updatedFields.password;
     if (updatedFields.latitude) payload.latitude = updatedFields.latitude;
     if (updatedFields.longitude) payload.longitude = updatedFields.longitude;
     if (updatedFields.image) payload.image_url = updatedFields.image;
@@ -176,12 +174,7 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
       .update(payload)
       .eq('id', storeId);
 
-    if (error) {
-      console.error('SHOP UPDATE ERROR:', error.message);
-      return false;
-    }
-
-    return true;
+    return !error;
   } catch {
     return false;
   }

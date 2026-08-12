@@ -53,8 +53,10 @@ export default function ManualGroceryFormCard({ onAddItem }) {
   const [itemName, setItemName] = useState('');
   const [brand, setBrand] = useState('');
   const [quantityUnit, setQuantityUnit] = useState('2 kg');
+  const [replacementPreference, setReplacementPreference] = useState('replace_brand');
   const [description, setDescription] = useState('');
   const [validationError, setValidationError] = useState('');
+
 
   // Autocomplete suggestions dropdown state for Item Name
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -141,6 +143,7 @@ export default function ManualGroceryFormCard({ onAddItem }) {
       qty: qty,
       unit: unit,
       quantityUnit: quantityUnit.trim(),
+      replacementPreference: replacementPreference,
       description: description.trim()
     };
   };
@@ -156,6 +159,7 @@ export default function ManualGroceryFormCard({ onAddItem }) {
     setItemName('');
     setBrand('');
     setQuantityUnit('2 kg');
+    setReplacementPreference('replace_brand');
     setDescription('');
 
     addToast(`${itemPayload.itemName} (${itemPayload.quantityUnit}) added to list ✓`, 'success');
@@ -335,7 +339,25 @@ export default function ManualGroceryFormCard({ onAddItem }) {
           )}
         </div>
 
-        {/* FIELD 4: DESCRIPTION */}
+        {/* FIELD 4: IF ITEM UNAVAILABLE PREFERENCE DROPDOWN */}
+        <div>
+          <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700 mb-1.5">
+            If Item Unavailable <span className="text-rose-500">*</span>
+          </label>
+          <select
+            value={replacementPreference}
+            onChange={(e) => setReplacementPreference(e.target.value)}
+            className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-3 text-xs sm:text-sm font-extrabold text-stone-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+          >
+            <option value="replace_brand">Replace with another brand</option>
+            <option value="cancel_item">Cancel item</option>
+          </select>
+          <p className="text-[11px] text-stone-400 mt-1 font-medium">
+            Instruction for shopkeeper if this brand/item is out of stock.
+          </p>
+        </div>
+
+        {/* FIELD 5: DESCRIPTION */}
         <div>
           <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700 mb-1.5">
             Description <span className="text-stone-400 text-[10px] font-normal uppercase">(Optional)</span>

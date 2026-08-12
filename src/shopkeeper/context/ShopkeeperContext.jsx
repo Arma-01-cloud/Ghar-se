@@ -1,35 +1,111 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { fetchShopkeeperOrders, updateOrderStatusInSupabase } from '../../services/orderService';
-import { INITIAL_NOTIFICATIONS } from '../data/notifications';
 import { validateStatusTransition } from '../services/shopkeeperService';
+import { get10DigitPhone } from '../../services/authService';
 
 const ShopkeeperContext = createContext();
 
 export const ShopkeeperProvider = ({ children }) => {
   const [authUser, setAuthUser] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [hasStore, setHasStore] = useState(false);
+  
+  // Persist isLoggedIn state
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      return localStorage.getItem('gharsee_shopkeeper_logged_in') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [hasStore, setHasStore] = useState(() => {
+    try {
+      return localStorage.getItem('gharsee_has_store') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [isCheckingStore, setIsCheckingStore] = useState(true);
 
-  const [storeProfile, setStoreProfile] = useState(null);
+  // Store profile initialized to null (no mock Sri Lakshmi store fallback!)
+  const [storeProfile, setStoreProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gharsee_store_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // Shopkeeper orders & products
-  const [orders, setOrders] = useState([]);
+  // Initialize orders with localStorage backup for instant persistence across page refreshes
+  const [orders, setOrders] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gharsee_shopkeeper_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [products, setProducts] = useState([]);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const [activeShopkeeperTab, setActiveShopkeeperTab] = useState('dashboard');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [toasts, setToasts] = useState([]);
 
-  // Check Supabase Authentication and Store Registration
+  // Query Supabase for store owned by authenticated user via 10-digit phone or owner_id
+  const loadUserStoreFromSupabase = async (userId, userPhone) => {
+    if (!isSupabaseConfigured) return;
+
+    try {
+      const cleanDigits = get10DigitPhone(userPhone);
+      const { data: allShops, error } = await supabase.from('shops').select('*');
+
+      let matchedShop = null;
+      if (!error && allShops && allShops.length > 0) {
+        matchedShop = allShops.find(s => 
+          (userId && s.owner_id === userId) || 
+          (cleanDigits && get10DigitPhone(s.phone) === cleanDigits)
+        );
+      }
+
+      if (matchedShop) {
+        setHasStore(true);
+        const prof = {
+          id: matchedShop.id,
+          name: matchedShop.name,
+          ownerName: matchedShop.owner_name || 'Store Owner',
+          phone: matchedShop.phone || userPhone,
+          email: matchedShop.email || 'store@gharsee.app',
+          address: matchedShop.address || 'Chikkamagaluru, Karnataka',
+          isOpen: matchedShop.status === 'open' || matchedShop.status === 'active' || true,
+          ...matchedShop
+        };
+        setStoreProfile(prof);
+        try {
+          localStorage.setItem('gharsee_has_store', 'true');
+          localStorage.setItem('gharsee_store_profile', JSON.stringify(prof));
+        } catch {}
+      } else {
+        setHasStore(false);
+        setStoreProfile(null);
+        try {
+          localStorage.setItem('gharsee_has_store', 'false');
+          localStorage.removeItem('gharsee_store_profile');
+        } catch {}
+      }
+    } catch (err) {
+      console.error('Error fetching shopkeeper store from Supabase:', err);
+    }
+  };
+
+  // Check Supabase Authentication & Store Registration on Mount
   useEffect(() => {
     async function checkShopkeeperAuthAndStore() {
       setIsCheckingStore(true);
 
       if (!isSupabaseConfigured) {
-        setIsLoggedIn(false);
-        setHasStore(false);
         setIsCheckingStore(false);
         return;
       }
@@ -40,41 +116,18 @@ export const ShopkeeperProvider = ({ children }) => {
         if (user) {
           setAuthUser(user);
           setIsLoggedIn(true);
-
-          // Query shop owned by authenticated user in Supabase shops table
-          const { data, error } = await supabase
-            .from('shops')
-            .select('*')
-            .eq('owner_id', user.id)
-            .limit(1);
-
-          if (!error && data && data.length > 0) {
-            setHasStore(true);
-            setStoreProfile({
-              id: data[0].id,
-              name: data[0].name,
-              ownerName: user.user_metadata?.full_name || 'Store Partner',
-              phone: user.user_metadata?.phone || '+919876543210',
-              email: user.email || 'store@gharsee.app',
-              address: data[0].address || 'Indiranagar, Bengaluru',
-              isOpen: data[0].status === 'open' || data[0].status === 'active' || true,
-              ...data[0]
-            });
-          } else {
+          try { localStorage.setItem('gharsee_shopkeeper_logged_in', 'true'); } catch {}
+          await loadUserStoreFromSupabase(user.id, user.phone || user.user_metadata?.phone);
+        } else {
+          // If no active auth session, rely on local session state or reset
+          if (!localStorage.getItem('gharsee_shopkeeper_logged_in')) {
+            setIsLoggedIn(false);
             setHasStore(false);
             setStoreProfile(null);
           }
-        } else {
-          setAuthUser(null);
-          setIsLoggedIn(false);
-          setHasStore(false);
-          setStoreProfile(null);
         }
       } catch (err) {
         console.error('Error checking shopkeeper auth:', err);
-        setAuthUser(null);
-        setIsLoggedIn(false);
-        setHasStore(false);
       } finally {
         setIsCheckingStore(false);
       }
@@ -82,41 +135,23 @@ export const ShopkeeperProvider = ({ children }) => {
 
     checkShopkeeperAuthAndStore();
 
-    // Listen for real-time auth state changes
     if (isSupabaseConfigured) {
       const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
           setAuthUser(session.user);
           setIsLoggedIn(true);
-
-          // Query shop for logged in session user
-          const { data, error } = await supabase
-            .from('shops')
-            .select('*')
-            .eq('owner_id', session.user.id)
-            .limit(1);
-
-          if (!error && data && data.length > 0) {
-            setHasStore(true);
-            setStoreProfile({
-              id: data[0].id,
-              name: data[0].name,
-              ownerName: session.user.user_metadata?.full_name || 'Store Partner',
-              phone: session.user.user_metadata?.phone || '+919876543210',
-              email: session.user.email || 'store@gharsee.app',
-              address: data[0].address || 'Indiranagar, Bengaluru',
-              isOpen: data[0].status === 'open' || data[0].status === 'active' || true,
-              ...data[0]
-            });
-          } else {
-            setHasStore(false);
-            setStoreProfile(null);
-          }
+          try { localStorage.setItem('gharsee_shopkeeper_logged_in', 'true'); } catch {}
+          await loadUserStoreFromSupabase(session.user.id, session.user.phone || session.user.user_metadata?.phone);
         } else if (event === 'SIGNED_OUT') {
           setAuthUser(null);
           setIsLoggedIn(false);
           setHasStore(false);
           setStoreProfile(null);
+          try {
+            localStorage.removeItem('gharsee_shopkeeper_logged_in');
+            localStorage.removeItem('gharsee_has_store');
+            localStorage.removeItem('gharsee_store_profile');
+          } catch {}
         }
       });
 
@@ -126,15 +161,46 @@ export const ShopkeeperProvider = ({ children }) => {
     }
   }, []);
 
-  // Fetch real shopkeeper orders from Supabase database
-  useEffect(() => {
-    async function loadLiveOrders() {
-      if (storeProfile?.id) {
-        const live = await fetchShopkeeperOrders(storeProfile.id);
-        setOrders(live || []);
-      }
+  // Fetch real shopkeeper orders & derive live notifications from Supabase
+  const loadLiveOrders = async () => {
+    const shopId = storeProfile?.id || null;
+    const live = await fetchShopkeeperOrders(shopId);
+    if (live && live.length > 0) {
+      setOrders(live);
+      try {
+        localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(live));
+      } catch {}
+
+      // Build LIVE Notifications from real Supabase order pipeline
+      const liveAlerts = live.slice(0, 10).map(o => ({
+        id: `notif_${o.id}`,
+        title: `Order #${o.id} • ${o.status.toUpperCase()}`,
+        message: `Customer ${o.customerName} (${o.customerPhone || o.phone}) ordered ${o.items?.length || 1} items totaling ₹${o.total}`,
+        time: new Date(o.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+        type: o.status === 'pending' ? 'alert' : 'info'
+      }));
+      setNotifications(liveAlerts);
     }
-    loadLiveOrders();
+  };
+
+  useEffect(() => {
+    if (storeProfile?.id) {
+      loadLiveOrders();
+    }
+
+    if (isSupabaseConfigured) {
+      const orderChannel = supabase
+        .channel('public:orders:shopkeeper')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          loadLiveOrders();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(orderChannel);
+      };
+    }
   }, [storeProfile]);
 
   const addShopkeeperToast = (message, type = 'success') => {
@@ -154,44 +220,59 @@ export const ShopkeeperProvider = ({ children }) => {
     setStoreProfile(prev => {
       if (!prev) return prev;
       const newStatus = !prev.isOpen;
+      const updated = { ...prev, isOpen: newStatus };
+      try { localStorage.setItem('gharsee_store_profile', JSON.stringify(updated)); } catch {}
       addShopkeeperToast(`Store status updated: ${newStatus ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}`, 'info');
-      return { ...prev, isOpen: newStatus };
+      return updated;
     });
   };
 
   const updateStoreProfile = (newDetails) => {
-    setStoreProfile(prev => ({ ...prev, ...newDetails }));
+    setStoreProfile(prev => {
+      const updated = { ...prev, ...newDetails };
+      try { localStorage.setItem('gharsee_store_profile', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     addShopkeeperToast('Store profile updated successfully!', 'success');
   };
 
-  // Order Workflow Actions (Persisted to Supabase)
+  // Order Workflow Actions (Persisted directly to Supabase & localStorage)
   const acceptOrder = async (orderId) => {
-    setOrders(prev => prev.map(o => {
+    const updated = orders.map(o => {
       if (o.id === orderId) return { ...o, status: 'accepted' };
       return o;
-    }));
+    });
+    setOrders(updated);
+    try { localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(updated)); } catch {}
+
     await updateOrderStatusInSupabase(orderId, 'accepted');
     addShopkeeperToast(`Order #${orderId} accepted successfully! ✓`, 'success');
   };
 
   const rejectOrder = async (orderId, reason) => {
-    setOrders(prev => prev.map(o => {
+    const updated = orders.map(o => {
       if (o.id === orderId) return { ...o, status: 'rejected', rejectionReason: reason };
       return o;
-    }));
+    });
+    setOrders(updated);
+    try { localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(updated)); } catch {}
+
     await updateOrderStatusInSupabase(orderId, 'rejected');
     addShopkeeperToast(`Order #${orderId} rejected.`, 'error');
   };
 
   const updateOrderStatus = async (orderId, nextStatus) => {
-    setOrders(prev => prev.map(o => {
+    const updated = orders.map(o => {
       if (o.id === orderId) {
         if (validateStatusTransition(o.status, nextStatus)) {
           return { ...o, status: nextStatus };
         }
       }
       return o;
-    }));
+    });
+    setOrders(updated);
+    try { localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(updated)); } catch {}
+
     await updateOrderStatusInSupabase(orderId, nextStatus);
     addShopkeeperToast(`Order #${orderId} status updated to ${nextStatus.replace(/_/g, ' ').toUpperCase()}`, 'success');
   };
@@ -205,9 +286,13 @@ export const ShopkeeperProvider = ({ children }) => {
   const avgOrderValue = todayOrders > 0 ? Math.round(totalSales / todayOrders) : 0;
   const lowStockProducts = products.filter(p => p.stock <= p.minThreshold);
 
-  const loginShopkeeper = (userObj) => {
+  const loginShopkeeper = async (userObj) => {
     setAuthUser(userObj);
     setIsLoggedIn(true);
+    try {
+      localStorage.setItem('gharsee_shopkeeper_logged_in', 'true');
+    } catch {}
+    await loadUserStoreFromSupabase(userObj.id, userObj.phone);
   };
 
   const logoutShopkeeper = async () => {
@@ -218,6 +303,12 @@ export const ShopkeeperProvider = ({ children }) => {
     setIsLoggedIn(false);
     setHasStore(false);
     setStoreProfile(null);
+    try {
+      localStorage.removeItem('gharsee_shopkeeper_logged_in');
+      localStorage.removeItem('gharsee_has_store');
+      localStorage.removeItem('gharsee_store_profile');
+      localStorage.removeItem('gharsee_shopkeeper_orders');
+    } catch {}
     addShopkeeperToast('Logged out of Store Partner Portal', 'info');
     window.location.href = '/';
   };

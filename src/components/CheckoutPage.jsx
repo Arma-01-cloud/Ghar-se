@@ -3,11 +3,11 @@ import { useCart } from '../context/CartContext';
 import { MapPin, Clock, CreditCard, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function CheckoutPage() {
-  const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab } = useCart();
+  const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab, customerPhone } = useCart();
 
   const [address, setAddress] = useState({
     fullName: 'Rahul Sharma',
-    phone: '+91 98765 43210',
+    phone: customerPhone || '+91 98765 43210',
     flat: 'Flat 402, Green Meadows Apartment',
     street: '100 Feet Road, Indiranagar',
     city: 'Bengaluru',
@@ -37,6 +37,8 @@ export default function CheckoutPage() {
     const paymentLabel = paymentMethod === 'upi' ? `UPI (${upiApp.toUpperCase()})` : paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery';
 
     placeOrder({
+      fullName: address.fullName,
+      phone: address.phone,
       subtotal: cartSubtotal,
       deliveryFee: deliveryFee,
       discount: 0,

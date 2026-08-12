@@ -1,64 +1,111 @@
 import React, { useState } from 'react';
 import { useRider } from '../context/RiderContext';
-import { signInUserWithPhone, signUpUserWithPhone } from '../../services/authService';
-import { Bike, Phone, Lock, User, ArrowLeft, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { signUpUserWithPhone, signInUserWithPhone } from '../../services/authService';
+import { supabase } from '../../lib/supabase';
+import { Bike, Phone, Lock, User, ArrowLeft, ArrowRight, Loader2, AlertCircle, ShieldCheck, MapPin } from 'lucide-react';
 
 export default function RiderLogin() {
   const { loginRider, addRiderToast } = useRider();
 
   const [mode, setMode] = useState('login'); // 'login' or 'signup'
+  const [signupStep, setSignupStep] = useState(1); // 1: Account, 2: Vehicle details
+
+  // Step 1 State
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+
+  // Step 2 Vehicle Details State
+  const [vehicleType, setVehicleType] = useState('scooter');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [drivingLicense, setDrivingLicense] = useState('');
+  const [deliveryCity, setDeliveryCity] = useState('Bengaluru');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleNextStep1 = (e) => {
     e.preventDefault();
-    if (!phone.trim() || !password) return;
-
-    if (mode === 'signup' && password !== confirmPassword) {
+    if (!fullName.trim() || !phone.trim() || !password) {
+      setErrorMsg('Please fill in all required fields.');
+      return;
+    }
+    if (password !== confirmPassword) {
       setErrorMsg('Passwords do not match. Please check and try again.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setSignupStep(2);
+  };
+
+  const handleCompleteRegistration = async (e) => {
+    e.preventDefault();
+    if (!vehicleNumber.trim() || !drivingLicense.trim()) {
+      setErrorMsg('Please enter your vehicle registration number and driving license number.');
       return;
     }
 
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    if (mode === 'signup') {
-      const res = await signUpUserWithPhone({
-        phone: phone.trim(),
-        password,
-        fullName: fullName.trim() || 'Delivery Partner',
-        role: 'rider'
-      });
+    // 1. Sign up user profile
+    const res = await signUpUserWithPhone({
+      phone: phone.trim(),
+      password,
+      fullName: fullName.trim() || 'Delivery Partner',
+      role: 'rider'
+    });
 
+    if (res.error) {
       setIsSubmitting(false);
+      setErrorMsg(res.error);
+      addRiderToast(res.error, 'error');
+      return;
+    }
 
-      if (res.error) {
-        setErrorMsg(res.error);
-        addRiderToast(res.error, 'error');
-      } else {
-        addRiderToast('Delivery partner account created! Logging in...', 'success');
-        loginRider(res.user);
-      }
+    // 2. Insert or update rider_profiles record with vehicle details
+    try {
+      await supabase.from('rider_profiles').upsert({
+        user_id: res.user.id,
+        full_name: fullName.trim(),
+        phone: res.user.phone,
+        vehicle_type: vehicleType,
+        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        driving_license: drivingLicense.trim().toUpperCase(),
+        delivery_city: deliveryCity,
+        is_online: true
+      }, { onConflict: 'phone' });
+    } catch (err) {
+      console.error('Error saving rider vehicle details:', err);
+    }
+
+    setIsSubmitting(false);
+    addRiderToast('Rider account & vehicle details registered successfully! 🚴', 'success');
+    loginRider(res.user);
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!phone.trim() || !password) return;
+
+    setIsSubmitting(true);
+    setErrorMsg(null);
+
+    const res = await signInUserWithPhone({
+      phone: phone.trim(),
+      password
+    });
+
+    setIsSubmitting(false);
+
+    if (res.error) {
+      setErrorMsg(res.error);
+      addRiderToast(res.error, 'error');
     } else {
-      const res = await signInUserWithPhone({
-        phone: phone.trim(),
-        password
-      });
-
-      setIsSubmitting(false);
-
-      if (res.error) {
-        setErrorMsg(res.error);
-        addRiderToast(res.error, 'error');
-      } else {
-        addRiderToast('Welcome back to Delivery Partner App! 🚴', 'success');
-        loginRider(res.user);
-      }
+      addRiderToast('Welcome back to Delivery Partner App! 🚴', 'success');
+      loginRider(res.user);
     }
   };
 
@@ -75,7 +122,7 @@ export default function RiderLogin() {
         </a>
       </div>
 
-      {/* LOGIN CARD */}
+      {/* LOGIN / SIGNUP CARD */}
       <div className="w-full max-w-md mx-auto bg-white rounded-3xl border border-stone-200 p-8 shadow-xl space-y-6 my-auto">
         
         {/* BRAND LOGO & TITLE */}
@@ -89,14 +136,17 @@ export default function RiderLogin() {
               Ghar<span className="text-emerald-600">See</span> Delivery
             </span>
             <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider">
-              {mode === 'signup' ? 'NEW RIDER REGISTRATION' : 'RIDER PORTAL LOGIN'}
+              {mode === 'signup' 
+                ? (signupStep === 1 ? 'STEP 1: RIDER ACCOUNT' : 'STEP 2: VEHICLE DETAILS')
+                : 'RIDER PORTAL LOGIN'
+              }
             </span>
           </div>
 
           <p className="text-stone-500 text-xs sm:text-sm pt-1">
             {mode === 'signup'
-              ? 'Register as a delivery partner using your mobile number and password.'
-              : 'Sign in with your mobile number and password to view delivery tasks.'
+              ? (signupStep === 1 ? 'Enter your personal account credentials.' : 'Enter your delivery vehicle and license information.')
+              : 'Sign in with your mobile number and password.'
             }
           </p>
         </div>
@@ -109,10 +159,63 @@ export default function RiderLogin() {
           </div>
         )}
 
-        {/* FORM */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold">
-          
-          {mode === 'signup' && (
+        {/* LOGIN FORM */}
+        {mode === 'login' && (
+          <form onSubmit={handleLogin} className="space-y-4 text-xs font-semibold">
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Mobile Phone Number *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="+91 98765 00112"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                />
+                <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Password *
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                />
+                <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>LOGIN TO RIDER APP</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* SIGNUP STEP 1 FORM */}
+        {mode === 'signup' && signupStep === 1 && (
+          <form onSubmit={handleNextStep1} className="space-y-4 text-xs font-semibold">
             <div>
               <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
                 Full Name *
@@ -129,43 +232,41 @@ export default function RiderLogin() {
                 <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
               </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-              Mobile Phone Number *
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                placeholder="+91 98765 00112"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
-              />
-              <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Mobile Phone Number *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="+91 98765 00112"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                />
+                <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-              Password *
-            </label>
-            <div className="relative">
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
-              />
-              <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Password *
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                />
+                <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
             </div>
-          </div>
 
-          {mode === 'signup' && (
             <div>
               <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
                 Confirm Password *
@@ -182,24 +283,112 @@ export default function RiderLogin() {
                 <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
               </div>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <span>{mode === 'signup' ? 'REGISTER RIDER PARTNER' : 'LOGIN TO RIDER APP'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
+            <button
+              type="submit"
+              className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2"
+            >
+              <span>NEXT: VEHICLE DETAILS</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+        )}
 
-        </form>
+        {/* SIGNUP STEP 2: VEHICLE DETAILS FORM */}
+        {mode === 'signup' && signupStep === 2 && (
+          <form onSubmit={handleCompleteRegistration} className="space-y-4 text-xs font-semibold animate-in fade-in">
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Vehicle Type *
+              </label>
+              <select
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value)}
+                className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-3 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
+              >
+                <option value="scooter">🛵 Scooter (Activa, Jupiter, etc.)</option>
+                <option value="motorcycle">🏍️ Motorcycle (Pulsar, Splendor, etc.)</option>
+                <option value="ev">⚡ Electric Scooter / EV</option>
+                <option value="bicycle">🚲 Bicycle</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Vehicle Registration Number *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="KA-01-EA-1234"
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-black text-stone-900 focus:outline-none focus:border-emerald-600 uppercase"
+                />
+                <Bike className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Driving License Number *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="KA0120230045678"
+                  value={drivingLicense}
+                  onChange={(e) => setDrivingLicense(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-black text-stone-900 focus:outline-none focus:border-emerald-600 uppercase"
+                />
+                <ShieldCheck className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
+                Preferred Delivery City *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="Bengaluru / Chikkamagaluru"
+                  value={deliveryCity}
+                  onChange={(e) => setDeliveryCity(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-3 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
+                />
+                <MapPin className="w-4 h-4 text-stone-400 absolute left-3.5 top-3.5" />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSignupStep(1)}
+                className="py-3.5 px-4 bg-stone-100 text-stone-700 font-bold text-xs rounded-2xl"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 py-3.5 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <span>SUBMIT & START DELIVERING</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* TOGGLE MODE */}
         <div className="pt-4 border-t border-stone-100 text-center space-y-2">
@@ -207,7 +396,7 @@ export default function RiderLogin() {
             <p className="text-xs font-semibold text-stone-600">
               New delivery partner?{' '}
               <button
-                onClick={() => { setMode('signup'); setErrorMsg(null); }}
+                onClick={() => { setMode('signup'); setSignupStep(1); setErrorMsg(null); }}
                 className="text-emerald-700 font-extrabold hover:underline"
               >
                 Register as Rider
@@ -217,7 +406,7 @@ export default function RiderLogin() {
             <p className="text-xs font-semibold text-stone-600">
               Already registered?{' '}
               <button
-                onClick={() => { setMode('login'); setErrorMsg(null); }}
+                onClick={() => { setMode('login'); setSignupStep(1); setErrorMsg(null); }}
                 className="text-emerald-700 font-extrabold hover:underline"
               >
                 Sign In to Rider App

@@ -87,8 +87,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
 
     setTimeout(() => {
       onClose();
-      window.history.pushState(null, '', '/shopkeeper');
-      window.dispatchEvent(new Event('popstate'));
+      window.location.href = '/shopkeeper';
     }, 800);
   };
 
@@ -121,8 +120,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
 
     setTimeout(() => {
       onClose();
-      window.history.pushState(null, '', '/rider');
-      window.dispatchEvent(new Event('popstate'));
+      window.location.href = '/rider';
     }, 800);
   };
 
@@ -149,6 +147,11 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
     setFeedback({ type: 'success', message: 'Logged in successfully!' });
     setTimeout(() => {
       onClose();
+      if (res.user?.user_metadata?.role === 'shopkeeper' || res.profile?.role === 'shopkeeper') {
+        window.location.href = '/shopkeeper';
+      } else if (res.user?.user_metadata?.role === 'rider' || res.profile?.role === 'rider') {
+        window.location.href = '/rider';
+      }
     }, 800);
   };
 
@@ -345,7 +348,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
               <input
                 type="text"
                 required
-                placeholder="100 Feet Road, Indiranagar, Bengaluru"
+                placeholder="Market Road, Chikkamagaluru"
                 value={shopForm.address}
                 onChange={(e) => setShopForm({ ...shopForm, address: e.target.value })}
                 className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-amber-600"
@@ -426,7 +429,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
               <input
                 type="text"
                 required
-                placeholder="Indiranagar, Bengaluru"
+                placeholder="Chikkamagaluru"
                 value={riderForm.address}
                 onChange={(e) => setRiderForm({ ...riderForm, address: e.target.value })}
                 className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-blue-600"

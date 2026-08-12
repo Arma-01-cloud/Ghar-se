@@ -11,7 +11,9 @@ export const STORES = [
     closingTime: '10:00 PM',
     categories: ['Groceries', 'Dairy', 'Household', 'Staples'],
     isPopular: true,
-    address: '100 Feet Road, Indiranagar, Bengaluru'
+    address: 'Market Road, Chikkamagaluru, Karnataka',
+    phone: '8123821300',
+    shopkeeperPhone: '+91 81238 21300'
   },
   {
     id: 'store-2',
@@ -25,7 +27,9 @@ export const STORES = [
     closingTime: '10:30 PM',
     categories: ['Fruits & Veggies', 'Dairy', 'Beverages'],
     isPopular: true,
-    address: '12th Main Road, HAL 2nd Stage, Bengaluru'
+    address: 'MG Road, Chikkamagaluru, Karnataka',
+    phone: '7760032354',
+    shopkeeperPhone: '+91 77600 32354'
   },
   {
     id: 'store-3',
@@ -39,7 +43,9 @@ export const STORES = [
     closingTime: '9:30 PM',
     categories: ['Organic Fruits', 'Pesticide Free Veggies', 'Farm Milk'],
     isPopular: true,
-    address: '80 Feet Road, Koramangala, Bengaluru'
+    address: 'KM Road, Chikkamagaluru, Karnataka',
+    phone: '9108022641',
+    shopkeeperPhone: '+91 91080 22641'
   },
   {
     id: 'store-4',
@@ -53,7 +59,9 @@ export const STORES = [
     closingTime: '9:00 PM',
     categories: ['Basmati Rice', 'Pure Ghee & Oils', 'Dal Staples'],
     isPopular: false,
-    address: 'CMH Road, Indiranagar, Bengaluru'
+    address: 'Bus Stand Road, Chikkamagaluru, Karnataka',
+    phone: '8660120584',
+    shopkeeperPhone: '+91 86601 20584'
   },
   {
     id: 'store-5',
@@ -67,7 +75,9 @@ export const STORES = [
     closingTime: '11:00 PM',
     categories: ['Snacks', 'Beverages', 'Personal Care', 'Cleaning'],
     isPopular: false,
-    address: 'Old Airport Road, Murugeshpalya, Bengaluru'
+    address: 'Indira Canteen Road, Chikkamagaluru, Karnataka',
+    phone: '8123821300',
+    shopkeeperPhone: '+91 81238 21300'
   },
   {
     id: 'store-6',
@@ -81,6 +91,8 @@ export const STORES = [
     closingTime: '10:00 PM',
     categories: ['Express Groceries', 'Dairy', 'Daily Breads'],
     isPopular: true,
-    address: '6th Block, Koramangala, Bengaluru'
+    address: 'Main Bazaar, Chikkamagaluru, Karnataka',
+    phone: '7760032354',
+    shopkeeperPhone: '+91 77600 32354'
   }
 ];

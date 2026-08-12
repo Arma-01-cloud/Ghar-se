@@ -11,6 +11,7 @@ import StoresPage from './components/StoresPage';
 import StoreDetailPage from './components/StoreDetailPage';
 import ProductDetailModal from './components/ProductDetailModal';
 import StoreConflictModal from './components/StoreConflictModal';
+import CustomerOnboardingModal from './components/CustomerOnboardingModal';
 import UploadListPage from './components/UploadListPage';
 import AnyStoreOrderBuilder from './components/AnyStoreOrderBuilder';
 import CartPage from './components/CartPage';
@@ -20,14 +21,15 @@ import PromoBanner from './components/PromoBanner';
 import WhyUs from './components/WhyUs';
 import Footer from './components/Footer';
 import ToastContainer from './components/ToastContainer';
+import FloatingCartBar from './components/FloatingCartBar';
 
 function CustomerAppContent() {
-  const { activeTab } = useCart();
+  const { activeTab, isCustomerOnboardingOpen, setIsCustomerOnboardingOpen } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [quickViewProduct, setQuickViewProduct] = useState(null);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FBF9F5] text-stone-900 selection:bg-emerald-200 selection:text-emerald-950 pb-16 md:pb-0">
+    <div className="min-h-screen flex flex-col bg-[#FBF9F5] text-stone-900 selection:bg-emerald-200 selection:text-emerald-950 pb-16 md:pb-0 relative">
       
       {/* ANNOUNCEMENT BAR */}
       <AnnouncementBar />
@@ -67,6 +69,12 @@ function CustomerAppContent() {
       {/* SINGLE-STORE CART CONFLICT MODAL */}
       <StoreConflictModal />
 
+      {/* CUSTOMER PHONE & LOCATION ONBOARDING MODAL */}
+      <CustomerOnboardingModal
+        isOpen={isCustomerOnboardingOpen}
+        onClose={() => setIsCustomerOnboardingOpen(false)}
+      />
+
       {/* PRODUCT QUICK VIEW MODAL */}
       {quickViewProduct && (
         <ProductDetailModal
@@ -74,6 +82,9 @@ function CustomerAppContent() {
           onClose={() => setQuickViewProduct(null)}
         />
       )}
+
+      {/* FLOATING BOTTOM CART BAR */}
+      <FloatingCartBar />
 
       {/* TOAST NOTIFICATIONS */}
       <ToastContainer />

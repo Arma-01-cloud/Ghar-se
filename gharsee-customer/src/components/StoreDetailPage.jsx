@@ -4,7 +4,7 @@ import { STORES } from '../data/stores';
 import { PRODUCTS } from '../data/products';
 import ProductCard from './ProductCard';
 import GroceryListSection from './GroceryListSection';
-import { Star, MapPin, Clock, Heart, Store, Search, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Star, MapPin, Clock, Heart, Store, Search, ArrowLeft, ShieldCheck, CheckCircle2, Phone } from 'lucide-react';
 
 export default function StoreDetailPage() {
   const { selectedStoreId, currentStore, setCurrentStore, favoriteStores, toggleFavoriteStore, setActiveTab } = useCart();
@@ -16,7 +16,7 @@ export default function StoreDetailPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const isFavorite = favoriteStores.includes(store.id);
+  const isFavorite = favoriteStores ? favoriteStores.includes(store.id) : false;
   const isSelected = currentStore && currentStore.id === store.id;
 
   const handleSelectThisStore = () => {
@@ -33,6 +33,11 @@ export default function StoreDetailPage() {
       return true;
     });
   }, [searchQuery, selectedCategory]);
+
+  const shopkeeperPhone = store.phone || store.shopkeeperPhone || '+91 81238 21300';
+  const categoriesList = Array.isArray(store.categories) && store.categories.length > 0 
+    ? store.categories 
+    : ['Groceries', 'Dairy & Eggs', 'Cooking Essentials'];
 
   return (
     <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
@@ -64,7 +69,7 @@ export default function StoreDetailPage() {
       <div className="relative rounded-3xl overflow-hidden bg-white border border-stone-200 shadow-md">
         <div className="h-48 sm:h-64 relative bg-stone-900">
           <img
-            src={store.image || '/images/store_lakshmi.jpg'}
+            src={store.image || store.image_url || '/images/store_lakshmi.jpg'}
             alt={store.name}
             className="w-full h-full object-cover opacity-90"
           />
@@ -83,39 +88,62 @@ export default function StoreDetailPage() {
 
         {/* STORE INFO FOOTER STRIP */}
         <div className="p-6 sm:p-8 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-md">
-                  🟢 {store.status} • Closes {store.closingTime}
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-2.5 py-0.5 rounded-md">
+                  🟢 {store.status || 'Open'} • Closes {store.closingTime || '10:00 PM'}
                 </span>
               </div>
-              <h1 className="font-display text-2xl sm:text-4xl font-extrabold text-stone-900 mt-1">
+              <h1 className="font-display text-2xl sm:text-4xl font-extrabold text-stone-900">
                 {store.name}
               </h1>
-              <p className="text-xs sm:text-sm text-stone-500 font-medium flex items-center gap-1.5 mt-1">
-                <MapPin className="w-4 h-4 text-emerald-700" /> {store.address} ({store.distance} km away)
+              <p className="text-xs sm:text-sm text-stone-500 font-medium flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-emerald-700 shrink-0" /> {store.address} ({store.distance || '1.2 km'} away)
               </p>
+
+              {/* SHOPKEEPER CONTACT BADGE */}
+              <div className="inline-flex items-center gap-3 bg-emerald-50 border border-emerald-200 p-2.5 rounded-2xl text-xs font-bold text-emerald-950 mt-1">
+                <span className="flex items-center gap-1.5">
+                  <Phone className="w-4 h-4 text-emerald-700" /> Shopkeeper Contact: <strong>{shopkeeperPhone}</strong>
+                </span>
+                <div className="flex gap-1.5">
+                  <a
+                    href={`tel:${shopkeeperPhone.replace(/\s+/g, '')}`}
+                    className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold rounded-xl transition-colors"
+                  >
+                    📞 Call
+                  </a>
+                  <a
+                    href={`https://wa.me/${shopkeeperPhone.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-extrabold rounded-xl transition-colors"
+                  >
+                    💬 WhatsApp
+                  </a>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200 text-center">
+            <div className="flex items-center gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200 text-center shrink-0">
               <div>
                 <span className="text-[10px] text-stone-400 font-bold block uppercase">Rating</span>
                 <span className="font-black text-lg text-amber-500 flex items-center gap-0.5 justify-center">
-                  <Star className="w-4 h-4 fill-amber-400" /> {store.rating}
+                  <Star className="w-4 h-4 fill-amber-400" /> {store.rating || 5.0}
                 </span>
               </div>
               <div className="border-l border-stone-200 pl-4">
                 <span className="text-[10px] text-stone-400 font-bold block uppercase">Delivery</span>
                 <span className="font-black text-base text-emerald-950 flex items-center gap-1 justify-center">
-                  <Clock className="w-4 h-4 text-emerald-700" /> {store.deliveryTime}
+                  <Clock className="w-4 h-4 text-emerald-700" /> {store.deliveryTime || '15-25 min'}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2 border-t border-stone-100">
-            {store.categories.map((c, i) => (
+            {categoriesList.map((c, i) => (
               <span key={i} className="bg-stone-100 text-stone-700 text-xs font-extrabold px-3 py-1 rounded-lg">
                 {c}
               </span>

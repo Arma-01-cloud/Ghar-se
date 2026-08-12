@@ -1,35 +1,69 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import confetti from 'canvas-confetti';
+import { STORES } from '../data/stores';
 import { fetchStores } from '../services/storeService';
-import { createOrderInSupabase, fetchCustomerOrders } from '../services/orderService';
+import { fetchCustomerAddressByPhone, saveCustomerPhoneAddress } from '../services/locationService';
+import { fetchCustomerOrders, createOrderInSupabase } from '../services/orderService';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import confetti from 'canvas-confetti';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  // Current Customer Location (Default: Indiranagar, Bengaluru)
-  const [currentLocation, setCurrentLocationState] = useState(() => {
+  // Saved Customer Name State
+  const [customerName, setCustomerNameState] = useState(() => {
+    try {
+      return localStorage.getItem('gharsee_customer_name') || 'Customer';
+    } catch {
+      return 'Customer';
+    }
+  });
+
+  // Saved Customer Phone Number State
+  const [customerPhone, setCustomerPhoneState] = useState(() => {
+    try {
+      return localStorage.getItem('gharsee_customer_phone') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Onboarding Modal Trigger State
+  const [isCustomerOnboardingOpen, setIsCustomerOnboardingOpen] = useState(() => {
+    try {
+      return !localStorage.getItem('gharsee_customer_phone');
+    } catch {
+      return true;
+    }
+  });
+
+  // Customer Location State
+  const [currentLocation, setCurrentLocation] = useState(() => {
     try {
       const saved = localStorage.getItem('gharsee_current_location');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return { name: 'Indiranagar, Bengaluru', latitude: 12.9784, longitude: 77.6408 };
+    return {
+      latitude: 13.3161,
+      longitude: 75.7720,
+      name: 'Chikkamagaluru, Karnataka',
+      flat: '',
+      street: ''
+    };
   });
 
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [availableStores, setAvailableStores] = useState(STORES);
 
-  // Available stores sorted by Haversine distance (defaults to empty array)
-  const [availableStores, setAvailableStores] = useState([]);
-
-  // Current Selected Store (defaults to null until selected)
+  // Selected Store
   const [currentStore, setCurrentStoreState] = useState(() => {
     try {
       const saved = localStorage.getItem('gharsee_current_store');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return null;
+    return STORES[0];
   });
 
-  // Favorite Stores IDs (defaults to empty array)
+  // Favorite Stores IDs
   const [favoriteStores, setFavoriteStores] = useState(() => {
     try {
       const saved = localStorage.getItem('gharsee_favorite_stores');
@@ -51,8 +85,15 @@ export const CartProvider = ({ children }) => {
     }
   });
 
-  // Orders state (defaults to empty array - NO mock orders!)
-  const [orders, setOrders] = useState([]);
+  // Orders state initialized with localStorage for instant persistence across page refreshes
+  const [orders, setOrders] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gharsee_customer_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const [toasts, setToasts] = useState([]);
   const [wishlist, setWishlist] = useState([]);
@@ -60,21 +101,78 @@ export const CartProvider = ({ children }) => {
   const [selectedStoreId, setSelectedStoreId] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // Load customer orders from Supabase database
+  const setCustomerName = (nameVal) => {
+    setCustomerNameState(nameVal);
+    try {
+      localStorage.setItem('gharsee_customer_name', nameVal);
+    } catch {}
+  };
+
+  const setCustomerPhone = (phoneNum) => {
+    setCustomerPhoneState(phoneNum);
+    try {
+      localStorage.setItem('gharsee_customer_phone', phoneNum);
+    } catch {}
+  };
+
+  // Fetch returning customer address & profile when phone number changes
   useEffect(() => {
-    async function loadLiveCustomerOrders() {
-      const liveOrders = await fetchCustomerOrders();
-      if (liveOrders && liveOrders.length > 0) {
-        setOrders(liveOrders);
+    async function loadSavedAddress() {
+      if (!customerPhone) return;
+      const savedAddress = await fetchCustomerAddressByPhone(customerPhone);
+      if (savedAddress && savedAddress.address_text) {
+        if (savedAddress.full_name) {
+          setCustomerName(savedAddress.full_name);
+        }
+        setCurrentLocation(prev => ({
+          ...prev,
+          name: savedAddress.address_text || prev.name,
+          latitude: savedAddress.latitude || prev.latitude,
+          longitude: savedAddress.longitude || prev.longitude,
+          flat: savedAddress.flat || prev.flat,
+          street: savedAddress.street || prev.street
+        }));
       }
     }
-    loadLiveCustomerOrders();
-  }, []);
+    loadSavedAddress();
+  }, [customerPhone]);
 
-  // Fetch and sort stores by Haversine distance whenever customer location changes
+  // Load Customer Orders & Realtime Sync from Supabase
+  const loadLiveCustomerOrders = async () => {
+    const live = await fetchCustomerOrders(customerPhone);
+    if (live && live.length > 0) {
+      setOrders(live);
+      try {
+        localStorage.setItem('gharsee_customer_orders', JSON.stringify(live));
+      } catch {}
+    }
+  };
+
+  useEffect(() => {
+    loadLiveCustomerOrders();
+
+    if (isSupabaseConfigured) {
+      const channel = supabase
+        .channel('public:orders:customer')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          loadLiveCustomerOrders();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [customerPhone]);
+
+  // Fetch live stores from Supabase when location changes
   useEffect(() => {
     async function loadNearbyStores() {
-      const res = await fetchStores(currentLocation.latitude, currentLocation.longitude, currentLocation.name);
+      const lat = currentLocation?.latitude || 13.3161;
+      const lon = currentLocation?.longitude || 75.7720;
+      const locName = currentLocation?.name || '';
+
+      const res = await fetchStores(lat, lon, locName);
       if (res.stores && res.stores.length > 0) {
         setAvailableStores(res.stores);
         if (!currentStore || !res.stores.some(s => s.id === currentStore.id)) {
@@ -91,8 +189,11 @@ export const CartProvider = ({ children }) => {
   useEffect(() => {
     try {
       localStorage.setItem('gharsee_current_location', JSON.stringify(currentLocation));
+      if (customerPhone) {
+        saveCustomerPhoneAddress(customerPhone, currentLocation);
+      }
     } catch (e) {}
-  }, [currentLocation]);
+  }, [currentLocation, customerPhone]);
 
   // Save Current Store
   useEffect(() => {
@@ -129,54 +230,55 @@ export const CartProvider = ({ children }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const setCustomerLocation = (locationObj) => {
-    setCurrentLocationState(locationObj);
-    addToast(`Delivery location updated to ${locationObj.name}! Stores re-sorted by distance.`, 'info');
-  };
-
-  const toggleFavoriteStore = (storeId) => {
-    setFavoriteStores(prev => {
-      const isFav = prev.includes(storeId);
-      const storeObj = (availableStores || []).find(s => s.id === storeId);
-      const name = storeObj ? storeObj.name : 'Store';
-      if (isFav) {
-        addToast(`Removed ${name} from favorites`, 'info');
-        return prev.filter(id => id !== storeId);
-      } else {
-        addToast(`Added ${name} to your favorite stores ♥`, 'success');
-        return [...prev, storeId];
-      }
-    });
+  const setCustomerLocation = (loc) => {
+    setCurrentLocation(loc);
+    addToast(`Delivery location updated to ${loc.name}`, 'info');
   };
 
   const setCurrentStore = (store) => {
     if (cart.length > 0 && currentStore && currentStore.id !== store.id) {
       setStoreConflictModal({
-        targetStore: store
+        targetStore: store,
+        pendingItem: null
       });
       return;
     }
     setCurrentStoreState(store);
-    addToast(`Shopping from ${store.name} 🏪`, 'success');
+    addToast(`Selected store: ${store.name}`, 'info');
   };
 
-  const confirmSwitchStore = () => {
-    if (storeConflictModal?.targetStore) {
-      setCart([]);
-      setCurrentStoreState(storeConflictModal.targetStore);
-      addToast(`Switched store to ${storeConflictModal.targetStore.name}. Cart reset.`, 'info');
-    }
+  const confirmSwitchStore = (targetStore, itemToAdd = null) => {
+    setCart([]);
+    setCurrentStoreState(targetStore);
     setStoreConflictModal(null);
+    if (itemToAdd) {
+      setCart([{ product: itemToAdd.product, quantity: itemToAdd.quantity || 1, storeId: targetStore.id }]);
+      addToast(`Switched to ${targetStore.name} & added ${itemToAdd.product.name}`, 'success');
+    } else {
+      addToast(`Switched active store to ${targetStore.name}`, 'info');
+    }
   };
 
-  const addToCart = (product, quantity = 1, targetStore = null) => {
-    const storeForProduct = targetStore || currentStore;
+  const toggleFavoriteStore = (storeId) => {
+    setFavoriteStores(prev => {
+      const isFav = prev.includes(storeId);
+      if (isFav) {
+        addToast('Removed store from favorites', 'info');
+        return prev.filter(id => id !== storeId);
+      } else {
+        addToast('Store added to favorites ❤️', 'success');
+        return [...prev, storeId];
+      }
+    });
+  };
 
-    if (cart.length > 0 && currentStore && currentStore.id !== storeForProduct?.id) {
+  const addToCart = (product, quantity = 1, storeForProduct = null) => {
+    const targetStore = storeForProduct || currentStore;
+
+    if (cart.length > 0 && currentStore && currentStore.id !== targetStore?.id) {
       setStoreConflictModal({
-        targetStore: storeForProduct,
-        pendingProduct: product,
-        pendingQuantity: quantity
+        targetStore: targetStore,
+        pendingItem: { product, quantity }
       });
       return;
     }
@@ -188,7 +290,7 @@ export const CartProvider = ({ children }) => {
         updated[existingIndex].quantity += quantity;
         return updated;
       }
-      return [...prev, { product, quantity, storeId: storeForProduct?.id }];
+      return [...prev, { product, quantity, storeId: targetStore?.id }];
     });
     addToast(`Added ${product.name} to cart!`, 'success');
   };
@@ -249,32 +351,44 @@ export const CartProvider = ({ children }) => {
     setCart([]);
   };
 
-  // Specific Store Order Placement (Persisted to Supabase)
+  // Specific Store Order Placement (Persisted to Supabase with real customerName)
   const placeOrder = async (orderDetails) => {
+    const phoneNum = customerPhone || orderDetails.phone || '+91 81238 21300';
+    const cName = orderDetails.fullName || customerName || 'Customer';
+
     const newOrder = {
       id: `GK-${Math.floor(10000 + Math.random() * 90000)}`,
       fulfillment_mode: 'store_selected',
       store_id: currentStore ? currentStore.id : null,
       storeName: currentStore ? currentStore.name : 'Local Grocery Store',
+      customerName: cName,
+      customerPhone: phoneNum,
       date: new Date().toISOString(),
       items: cart.map(item => ({
         id: item.product.id,
         name: item.product.name,
         price: item.product.price,
         quantity: item.quantity,
-        unit: item.product.unit,
+        qty: item.quantity,
+        unit: item.product.unit || '1 unit',
+        replacementPreference: item.product.replacementPreference || 'replace_brand',
         image: item.product.image
       })),
       subtotal: orderDetails.subtotal,
       deliveryFee: orderDetails.deliveryFee,
       discount: orderDetails.discount,
       totalAmount: orderDetails.totalAmount,
-      status: 'Order Placed',
+      status: 'pending',
       paymentMethod: orderDetails.paymentMethod,
       address: orderDetails.address
     };
 
-    setOrders(prev => [newOrder, ...prev]);
+    const updatedOrders = [newOrder, ...orders];
+    setOrders(updatedOrders);
+    try {
+      localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
+    } catch {}
+
     clearCart();
     await createOrderInSupabase(newOrder);
 
@@ -288,35 +402,47 @@ export const CartProvider = ({ children }) => {
     return newOrder;
   };
 
-  // "Shop From Any Store" Custom Order Placement (Persisted to Supabase)
+  // "Shop From Any Store" Custom Order Placement
   const placeAnyStoreOrder = async (groceryListItems, orderDetails) => {
+    const phoneNum = customerPhone || orderDetails.phone || '+91 81238 21300';
+    const cName = orderDetails.fullName || customerName || 'Customer';
+
     const newOrder = {
       id: `GS-${Math.floor(10000 + Math.random() * 90000)}`,
       fulfillment_mode: 'shop_any_store',
       store_id: null,
       storeName: 'Store Selection Pending (Rider Will Select)',
+      customerName: cName,
+      customerPhone: phoneNum,
       date: new Date().toISOString(),
       items: groceryListItems.map(item => ({
         id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        brand: item.brand,
-        notes: item.notes,
-        status: 'pending'
+        name: item.name || item.itemName,
+        price: item.price || 50,
+        quantity: item.quantity || 1,
+        qty: item.quantity || 1,
+        unit: item.unit || item.quantityUnit || '1 unit',
+        replacementPreference: item.replacementPreference || 'replace_brand',
+        image: '/images/cat_veg_fruits.jpg'
       })),
       subtotal: orderDetails.subtotal,
       deliveryFee: orderDetails.deliveryFee,
+      discount: 0,
       totalAmount: orderDetails.totalAmount,
-      status: 'SEARCHING_FOR_STORE',
-      paymentMethod: orderDetails.paymentMethod,
+      status: 'pending',
+      paymentMethod: orderDetails.paymentMethod || 'Cash on Delivery',
       address: orderDetails.address
     };
 
-    setOrders(prev => [newOrder, ...prev]);
+    const updatedOrders = [newOrder, ...orders];
+    setOrders(updatedOrders);
+    try {
+      localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
+    } catch {}
+
     await createOrderInSupabase(newOrder);
 
-    addToast(`"Shop From Any Store" Order #${newOrder.id} placed! Finding rider... 🛍️`, 'success');
+    addToast(`Custom order #${newOrder.id} placed! A nearby partner will fulfill it. 🛒`, 'success');
 
     try {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -345,6 +471,12 @@ export const CartProvider = ({ children }) => {
   return (
     <CartContext.Provider
       value={{
+        customerName,
+        setCustomerName,
+        customerPhone,
+        setCustomerPhone,
+        isCustomerOnboardingOpen,
+        setIsCustomerOnboardingOpen,
         cart,
         orders,
         toasts,

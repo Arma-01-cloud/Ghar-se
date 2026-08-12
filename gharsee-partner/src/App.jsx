@@ -23,8 +23,8 @@ function PartnerAppContent() {
     };
   }, []);
 
-  const isRiderRoute = currentPath.startsWith('/rider') || currentHash.includes('rider');
-  const isShopkeeperRoute = currentPath.startsWith('/shopkeeper') || currentHash.includes('shopkeeper');
+  const isRiderRoute = (currentPath || '').startsWith('/rider') || (currentHash || '').includes('rider');
+  const isShopkeeperRoute = (currentPath || '').startsWith('/shopkeeper') || (currentHash || '').includes('shopkeeper');
 
   // 1. RIDER PARTNER APP PORTAL
   if (isRiderRoute) {
@@ -56,8 +56,7 @@ function PartnerAppContent() {
           {/* SHOPKEEPER PORTAL CARD */}
           <div 
             onClick={() => {
-              window.history.pushState(null, '', '/shopkeeper');
-              window.dispatchEvent(new Event('popstate'));
+              window.location.href = '/shopkeeper';
             }}
             className="bg-white rounded-3xl border border-stone-200 p-8 shadow-xl hover:shadow-2xl hover:border-emerald-500 transition-all cursor-pointer group flex flex-col justify-between space-y-6"
           >
@@ -84,8 +83,7 @@ function PartnerAppContent() {
           {/* RIDER PORTAL CARD */}
           <div 
             onClick={() => {
-              window.history.pushState(null, '', '/rider');
-              window.dispatchEvent(new Event('popstate'));
+              window.location.href = '/rider';
             }}
             className="bg-white rounded-3xl border border-stone-200 p-8 shadow-xl hover:shadow-2xl hover:border-emerald-500 transition-all cursor-pointer group flex flex-col justify-between space-y-6"
           >

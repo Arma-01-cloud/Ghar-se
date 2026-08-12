@@ -123,6 +123,15 @@ export default function GroceryListItems({ items, onUpdateItem, onDeleteItem, on
                     </p>
                   )}
 
+                  <div className="text-xs font-semibold text-stone-600 flex items-center gap-1.5 pt-0.5">
+                    <span className="text-stone-400">If unavailable:</span>
+                    <span className={`px-2 py-0.5 rounded-md font-extrabold text-[11px] ${
+                      item.replacementPreference === 'cancel_item' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    }`}>
+                      {item.replacementPreference === 'cancel_item' ? '❌ Cancel Item' : '🔄 Replace with another brand'}
+                    </span>
+                  </div>
+
                   {displayDesc && (
                     <p className="text-xs text-stone-500 italic bg-white/60 p-2 rounded-xl border border-stone-200/60 max-w-lg">
                       "{displayDesc}"
