@@ -10,7 +10,7 @@ export default function FloatingCartBar() {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md mx-auto animate-in slide-in-from-bottom duration-300">
+    <div className="fixed bottom-16 lg:bottom-4 left-4 right-4 z-40 max-w-md mx-auto animate-in slide-in-from-bottom duration-300">
       <div 
         onClick={() => setActiveTab('cart')}
         className="bg-emerald-900 text-white rounded-3xl p-4 shadow-2xl border border-emerald-700/60 flex items-center justify-between cursor-pointer hover:bg-emerald-950 transition-all group"

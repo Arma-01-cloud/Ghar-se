@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CartProvider, useCart } from './context/CartContext';
 import AnnouncementBar from './components/AnnouncementBar';
 import Navbar from './components/Navbar';
+import MobileBottomNav from './components/MobileBottomNav';
 import Hero from './components/Hero';
 import TrustFeatures from './components/TrustFeatures';
 import FavoriteStoresSection from './components/FavoriteStoresSection';
@@ -29,7 +30,7 @@ function CustomerAppContent() {
   const [quickViewProduct, setQuickViewProduct] = useState(null);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FBF9F5] text-stone-900 selection:bg-emerald-200 selection:text-emerald-950 pb-16 md:pb-0 relative">
+    <div className="min-h-screen flex flex-col bg-[#FBF9F5] text-stone-900 selection:bg-emerald-200 selection:text-emerald-950 pb-20 lg:pb-0 relative">
       
       {/* ANNOUNCEMENT BAR */}
       <AnnouncementBar />
@@ -85,6 +86,9 @@ function CustomerAppContent() {
 
       {/* FLOATING BOTTOM CART BAR */}
       <FloatingCartBar />
+
+      {/* MOBILE & TABLET BOTTOM NAVIGATION BAR (MATCHING SCREENSHOT) */}
+      <MobileBottomNav />
 
       {/* TOAST NOTIFICATIONS */}
       <ToastContainer />

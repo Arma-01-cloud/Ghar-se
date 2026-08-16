@@ -4,6 +4,7 @@ import { ShopkeeperProvider } from './shopkeeper/context/ShopkeeperContext';
 import { RiderProvider } from './rider/context/RiderContext';
 import AnnouncementBar from './components/AnnouncementBar';
 import Navbar from './components/Navbar';
+import MobileBottomNav from './components/MobileBottomNav';
 import Hero from './components/Hero';
 import TrustFeatures from './components/TrustFeatures';
 import FavoriteStoresSection from './components/FavoriteStoresSection';
@@ -152,6 +153,9 @@ function AppContent() {
           onClose={() => setQuickViewProduct(null)}
         />
       )}
+
+      {/* MOBILE & TABLET BOTTOM NAVIGATION BAR (MATCHING SCREENSHOT) */}
+      <MobileBottomNav />
 
       {/* TOAST NOTIFICATIONS */}
       <ToastContainer />
