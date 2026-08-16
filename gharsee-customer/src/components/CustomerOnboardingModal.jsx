@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Phone, Compass, CheckCircle2, AlertCircle, Loader2, Building2, Search, ArrowRight, ShoppingBag, User } from 'lucide-react';
-import { getCurrentPositionCoordinates, fetchCustomerAddressByPhone, saveCustomerPhoneAddress } from '../services/locationService';
+import { getCurrentPositionWithAddress, fetchCustomerAddressByPhone, saveCustomerPhoneAddress } from '../services/locationService';
 import { useCart } from '../context/CartContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { get10DigitPhone } from '../services/authService';
@@ -75,12 +75,18 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
     setErrorMsg('');
 
     try {
-      const coords = await getCurrentPositionCoordinates();
+      const result = await getCurrentPositionWithAddress();
       setIsDetectingGPS(false);
       const gpsLoc = {
-        name: `My Location (${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)})`,
-        latitude: coords.latitude,
-        longitude: coords.longitude
+        name: result.name,
+        area: result.area,
+        district: result.district,
+        city: result.city,
+        state: result.state,
+        pincode: result.pincode,
+        formattedAddress: result.formattedAddress,
+        latitude: result.latitude,
+        longitude: result.longitude
       };
       setSelectedLocality(gpsLoc);
     } catch (err) {
@@ -124,8 +130,12 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
     await saveCustomerPhoneAddress({
       phone: normalizedPhone,
       fullName: nameVal,
-      addressText: selectedLocality.name,
-      city: selectedLocality.name.includes(',') ? selectedLocality.name.split(',')[1].trim() : 'Chikkamagaluru',
+      addressText: selectedLocality.formattedAddress || selectedLocality.name,
+      area: selectedLocality.area,
+      district: selectedLocality.district,
+      city: selectedLocality.city || (selectedLocality.name.includes(',') ? selectedLocality.name.split(',')[1].trim() : 'Bengaluru'),
+      state: selectedLocality.state,
+      pincode: selectedLocality.pincode,
       latitude: selectedLocality.latitude,
       longitude: selectedLocality.longitude
     });

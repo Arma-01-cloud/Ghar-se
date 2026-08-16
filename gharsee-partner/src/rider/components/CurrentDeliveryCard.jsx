@@ -19,6 +19,9 @@ export default function CurrentDeliveryCard({ delivery }) {
   const isPickedUp = delivery.status === 'picked_up';
   const isOutForDelivery = delivery.status === 'out_for_delivery';
 
+  const storePhoneDisplay = delivery.storePhone || '+91 81238 21300';
+  const customerPhoneDisplay = delivery.customerPhone || 'Phone not provided';
+
   return (
     <div className="bg-white rounded-3xl border-2 border-emerald-600 p-6 shadow-xl space-y-6">
       
@@ -72,28 +75,41 @@ export default function CurrentDeliveryCard({ delivery }) {
         {/* PICKUP STORE DETAILS */}
         <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
           <div className="flex items-center justify-between border-b border-stone-200/80 pb-2">
-            <span className="font-extrabold text-stone-900 uppercase text-[10px]">1. Pickup Store</span>
-            <button
-              onClick={() => navigateToStore(delivery.storeAddress, delivery.storeName)}
-              className="text-emerald-800 font-extrabold text-[11px] hover:underline flex items-center gap-1"
-            >
-              <Navigation className="w-3.5 h-3.5" /> Navigate
-            </button>
+            <span className="font-extrabold text-stone-900 uppercase text-[10px]">1. Pickup Store Details</span>
+            <div className="flex gap-2">
+              {storePhoneDisplay !== 'Phone not provided' && (
+                <a
+                  href={`tel:${storePhoneDisplay.replace(/\s+/g, '')}`}
+                  className="text-emerald-800 font-extrabold text-[11px] hover:underline flex items-center gap-1"
+                >
+                  <Phone className="w-3.5 h-3.5" /> Call Store
+                </a>
+              )}
+              <button
+                onClick={() => navigateToStore(delivery.storeAddress, delivery.storeName)}
+                className="text-emerald-800 font-extrabold text-[11px] hover:underline flex items-center gap-1"
+              >
+                <Navigation className="w-3.5 h-3.5" /> Navigate
+              </button>
+            </div>
           </div>
           <h4 className="font-black text-stone-900 text-sm">{delivery.storeName}</h4>
+          <p className="text-stone-700 font-bold flex items-center gap-1">
+            <Phone className="w-3.5 h-3.5 text-emerald-700" /> {storePhoneDisplay}
+          </p>
           <p className="text-stone-500">{delivery.storeAddress}</p>
         </div>
 
         {/* CUSTOMER DROP DETAILS */}
         <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
           <div className="flex items-center justify-between border-b border-stone-200/80 pb-2">
-            <span className="font-extrabold text-stone-900 uppercase text-[10px]">2. Customer Drop</span>
+            <span className="font-extrabold text-stone-900 uppercase text-[10px]">2. Customer Drop Details</span>
             <div className="flex gap-2">
               <button
-                onClick={() => callCustomer(delivery.customerPhone)}
+                onClick={() => callCustomer(customerPhoneDisplay)}
                 className="text-emerald-800 font-extrabold text-[11px] hover:underline flex items-center gap-1"
               >
-                <Phone className="w-3.5 h-3.5" /> Call
+                <Phone className="w-3.5 h-3.5" /> Call Customer
               </button>
               <button
                 onClick={() => navigateToCustomer(delivery.deliveryAddress)}
@@ -104,10 +120,29 @@ export default function CurrentDeliveryCard({ delivery }) {
             </div>
           </div>
           <h4 className="font-black text-stone-900 text-sm">{delivery.customerName}</h4>
+          <p className="text-stone-700 font-bold flex items-center gap-1">
+            <Phone className="w-3.5 h-3.5 text-emerald-700" /> {customerPhoneDisplay}
+          </p>
           <p className="text-stone-500">{delivery.deliveryAddress}</p>
         </div>
 
       </div>
+
+      {/* ITEMS IN THIS ORDER */}
+      {delivery.items && delivery.items.length > 0 && (
+        <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-2 text-xs">
+          <span className="font-extrabold uppercase tracking-wider text-stone-500 block text-[10px]">
+            Items in Order ({delivery.items.length})
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {delivery.items.map((item, idx) => (
+              <span key={idx} className="bg-white border border-stone-200 px-3 py-1 rounded-xl font-bold text-stone-800 text-[11px]">
+                {typeof item === 'string' ? item : `${item.name || item.product_name} (${item.quantity || item.qty} ${item.unit || 'unit'})`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* WORKFLOW ACTION BUTTONS */}
       <div className="pt-2">
@@ -120,60 +155,42 @@ export default function CurrentDeliveryCard({ delivery }) {
               <Navigation className="w-4 h-4 text-emerald-700" />
               <span>NAVIGATE TO STORE</span>
             </button>
+
             <button
-              onClick={markArrivedAtStore}
-              className="py-3.5 px-4 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-md flex items-center justify-center gap-2"
+              onClick={confirmPickup}
+              className="py-3.5 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>YES, I'VE ARRIVED AT STORE</span>
+              <Package className="w-4 h-4" />
+              <span>CONFIRM STORE PICKUP</span>
             </button>
           </div>
-        )}
-
-        {isArrived && (
-          <button
-            onClick={confirmPickup}
-            className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-display font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2"
-          >
-            <Package className="w-5 h-5" />
-            <span>CONFIRM ORDER PICKUP ({delivery.itemCount} ITEMS)</span>
-          </button>
         )}
 
         {isPickedUp && (
           <button
             onClick={startDelivery}
-            className="w-full py-4 px-6 bg-amber-500 hover:bg-amber-400 text-amber-950 font-display font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2"
+            className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-wider"
           >
-            <Bike className="w-5 h-5" />
+            <Bike className="w-4 h-4" />
             <span>START DELIVERY TO CUSTOMER</span>
           </button>
         )}
 
         {isOutForDelivery && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              onClick={() => navigateToCustomer(delivery.deliveryAddress)}
-              className="py-3.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-900 font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2"
-            >
-              <Navigation className="w-4 h-4 text-emerald-700" />
-              <span>NAVIGATE TO CUSTOMER</span>
-            </button>
-
-            <button
-              onClick={() => setShowOtpModal(true)}
-              className="py-3.5 px-4 bg-emerald-800 hover:bg-emerald-900 text-white font-display font-black text-xs rounded-2xl shadow-xl flex items-center justify-center gap-2"
-            >
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <span>COMPLETE DELIVERY (ENTER OTP)</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setShowOtpModal(true)}
+            className="w-full py-4 px-6 bg-emerald-900 hover:bg-emerald-950 text-white font-extrabold text-xs rounded-2xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-wider animate-pulse"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>VERIFY OTP & COMPLETE DELIVERY</span>
+          </button>
         )}
       </div>
 
+      {/* OTP VERIFICATION MODAL */}
       {showOtpModal && (
         <OTPVerificationModal
-          delivery={delivery}
+          customerPhone={delivery.customerPhone}
           onClose={() => setShowOtpModal(false)}
         />
       )}

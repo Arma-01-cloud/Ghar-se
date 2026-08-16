@@ -32,7 +32,21 @@ export function get10DigitPhone(phoneInput) {
 }
 
 // Phone + Password Sign Up for Shopkeepers (Saves password in shops table WITHOUT owner_id)
-export async function signUpUserWithPhone({ phone, password, fullName, storeName = 'My Grocery Store', role = 'shopkeeper' }) {
+export async function signUpUserWithPhone({ 
+  phone, 
+  password, 
+  fullName, 
+  storeName = 'My Grocery Store', 
+  role = 'shopkeeper',
+  address,
+  locality,
+  city,
+  state,
+  pincode,
+  latitude,
+  longitude,
+  imageUrl
+}) {
   if (!isSupabaseConfigured) {
     return { user: null, session: null, error: 'Supabase is not configured' };
   }
@@ -71,17 +85,28 @@ export async function signUpUserWithPhone({ phone, password, fullName, storeName
 
     // 3. Create store in Supabase shops table (WITHOUT owner_id to prevent FK errors!)
     if (role === 'shopkeeper') {
+      const shopLocality = locality || 'Indiranagar';
+      const shopCity = city || 'Bengaluru';
+      const shopState = state || 'Karnataka';
+      const shopAddress = address || `${shopLocality}, ${shopCity}, ${shopState}${pincode ? ' - ' + pincode : ''}`;
+
       const { data: newShop, error: shopErr } = await supabase
         .from('shops')
         .insert([{
           name: storeName,
           phone: normalizedPhone,
           password: password,
-          address: 'Chikkamagaluru, Karnataka',
-          latitude: 13.3161,
-          longitude: 75.7720,
-          status: 'open',
-          image_url: '/images/store_lakshmi.jpg'
+          address: shopAddress,
+          locality: shopLocality,
+          city: shopCity,
+          state: shopState,
+          pincode: pincode || '',
+          latitude: latitude != null ? parseFloat(latitude) : 12.9784,
+          longitude: longitude != null ? parseFloat(longitude) : 77.6408,
+          status: 'pending_approval',
+          is_open: false,
+          is_approved: false,
+          image_url: imageUrl || '/images/store_lakshmi.jpg'
         }])
         .select()
         .single();

@@ -67,7 +67,7 @@ export async function signUpRiderInSupabase({ phone, password, fullName, vehicle
       vehicle_number: vehicleNumber.trim().toUpperCase(),
       driving_license: drivingLicense.trim().toUpperCase(),
       delivery_city: deliveryCity,
-      is_online: true
+      is_online: false
     };
 
     const { data: newRider, error: insertErr } = await supabase
@@ -84,7 +84,7 @@ export async function signUpRiderInSupabase({ phone, password, fullName, vehicle
         full_name: fullName.trim(),
         phone: normalizedPhone,
         password: password,
-        is_online: true
+        is_online: false
       };
 
       const { data: retryData, error: retryErr } = await supabase
@@ -98,19 +98,29 @@ export async function signUpRiderInSupabase({ phone, password, fullName, vehicle
       }
 
       const riderUser = {
-        id: retryData?.id || generateUUID(),
+        id: retryData?.id,
         phone: normalizedPhone,
-        user_metadata: { full_name: fullName, role: 'rider' },
-        ...retryData
+        fullName: fullName.trim(),
+        name: fullName.trim(),
+        role: 'rider',
+        isOnline: false,
+        isPending: true,
+        isApproved: false,
+        status: 'pending_approval'
       };
       return { user: riderUser, error: null };
     }
 
     const riderUser = {
-      id: newRider?.id || generateUUID(),
+      id: newRider?.id,
       phone: normalizedPhone,
-      user_metadata: { full_name: fullName, role: 'rider' },
-      ...newRider
+      fullName: fullName.trim(),
+      name: fullName.trim(),
+      role: 'rider',
+      isOnline: false,
+      isPending: true,
+      isApproved: false,
+      status: 'pending_approval'
     };
 
     return { user: riderUser, error: null };

@@ -3,6 +3,16 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { fetchRiderDeliveries, updateOrderStatusInSupabase, assignStoreToAnyStoreOrder } from '../../services/orderService';
 import { get10DigitPhone } from '../../services/authService';
 import { updateRiderOnlineStatusInSupabase } from '../../services/riderService';
+import { 
+  subscribeToRiderNotifications, 
+  fetchPendingRiderNotification, 
+  respondToRiderNotification 
+} from '../services/notificationService';
+import { 
+  playIncomingPing, 
+  playAcceptChime, 
+  playDeclineThud 
+} from '../utils/notificationSound';
 import { INITIAL_RIDER_EARNINGS } from '../data/earnings';
 import { INITIAL_RIDER_PROFILE } from '../data/profile';
 import { INITIAL_RIDER_NOTIFICATIONS } from '../data/notifications';
@@ -22,6 +32,7 @@ export const RiderProvider = ({ children }) => {
 
   const [isOnline, setIsOnline] = useState(true);
   const [incomingRequest, setIncomingRequest] = useState(null);
+  const [incomingNotification, setIncomingNotification] = useState(null);
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [history, setHistory] = useState([]);
 
@@ -96,8 +107,13 @@ export const RiderProvider = ({ children }) => {
       }
 
       if (matched) {
+        const statusLower = (matched.status || '').toLowerCase();
+        const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matched.is_approved === false;
+        const isApproved = !isPending && statusLower !== 'rejected';
+
         const liveProfile = {
           id: matched.id,
+          fullName: matched.full_name || matched.name || 'Delivery Partner',
           name: matched.full_name || matched.name || 'Delivery Partner',
           phone: matched.phone || userPhone,
           email: matched.email || `${cleanDigits}@gharsee.app`,
@@ -109,11 +125,15 @@ export const RiderProvider = ({ children }) => {
           drivingLicense: matched.driving_license || matched.drivingLicense || 'Not specified',
           city: matched.delivery_city || matched.city || 'Chikkamagaluru, Karnataka',
           avatar: '/images/hero_grocery.jpg',
-          isOnline: matched.is_online !== false
+          status: matched.status,
+          isApproved: isApproved,
+          isPending: isPending,
+          is_approved: matched.is_approved,
+          isOnline: isApproved ? (matched.is_online !== false) : false
         };
 
         setProfile(liveProfile);
-        setIsOnline(matched.is_online !== false);
+        setIsOnline(liveProfile.isOnline);
         try {
           localStorage.setItem('gharsee_rider_profile', JSON.stringify(liveProfile));
         } catch {}
@@ -209,6 +229,40 @@ export const RiderProvider = ({ children }) => {
     loadLiveDeliveries();
   }, [isLoggedIn, isOnline]);
 
+  // Realtime Rider Notification Subscription for Instant Blinkit-Style Popup
+  useEffect(() => {
+    let realtimeChannel = null;
+
+    async function initRiderNotifications() {
+      if (!isLoggedIn || !isOnline || !profile?.id) return;
+
+      // 1. Fetch any unexpired pending notification on mount
+      const pendingNotif = await fetchPendingRiderNotification(profile.id);
+      if (pendingNotif && !activeDelivery) {
+        setIncomingNotification(pendingNotif);
+        playIncomingPing();
+      }
+
+      // 2. Subscribe to Supabase Realtime for instant incoming requests
+      realtimeChannel = subscribeToRiderNotifications(profile.id, (notifRecord) => {
+        if (notifRecord.status === 'pending' && !activeDelivery) {
+          setIncomingNotification(notifRecord);
+          playIncomingPing();
+        } else if (notifRecord.status === 'cancelled' || notifRecord.status === 'expired') {
+          setIncomingNotification((prev) => (prev?.id === notifRecord.id ? null : prev));
+        }
+      });
+    }
+
+    initRiderNotifications();
+
+    return () => {
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
+  }, [isLoggedIn, isOnline, profile?.id, !!activeDelivery]);
+
   const addRiderToast = (message, type = 'success') => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -242,17 +296,63 @@ export const RiderProvider = ({ children }) => {
     }
   };
 
-  // Workflow: ACCEPT DELIVERY
+  // Workflow: ACCEPT REALTIME NOTIFICATION POPUP (FIRST-ACCEPT-WINS IN SUPABASE)
+  const acceptIncomingNotification = async (notificationObj) => {
+    playAcceptChime();
+    const payload = notificationObj.payload || {};
+    const orderId = payload.orderId || notificationObj.order_id;
+
+    // 1. Update rider_notifications row to accepted
+    await respondToRiderNotification(notificationObj.id, 'accepted');
+
+    // 2. Update orders table in Supabase (status -> accepted, rider_id -> profile.id)
+    await updateOrderStatusInSupabase(orderId, 'accepted', profile?.id);
+
+    // 3. Set Active Delivery State with full Supabase details
+    const activeObj = {
+      id: orderId,
+      storeName: payload.storeName || 'Local Grocery Store',
+      storePhone: payload.storePhone || '+91 81238 21300',
+      storeAddress: payload.storeAddress || 'Market Road, Chikkamagaluru',
+      customerName: payload.customerName || 'Customer',
+      customerPhone: payload.customerPhone || 'Phone not provided',
+      deliveryAddress: payload.deliveryAddress || 'Chikkamagaluru, Karnataka',
+      distance: payload.distance || '1.8 km',
+      estimatedTime: payload.estimatedTime || '15-20 min',
+      items: payload.items || ['Grocery Items'],
+      itemCount: payload.itemCount || 1,
+      estimatedEarnings: payload.estimatedEarnings || 65,
+      paymentStatus: payload.paymentStatus || 'Cash on Delivery',
+      status: 'accepted'
+    };
+
+    setActiveDelivery(activeObj);
+    setIncomingNotification(null);
+    setIncomingRequest(null);
+    addRiderToast(`🎉 Order #${orderId} claimed! Head to pickup store.`, 'success');
+  };
+
+  // Workflow: DECLINE REALTIME NOTIFICATION POPUP
+  const declineIncomingNotification = async (notificationId, reason = 'Declined by rider') => {
+    playDeclineThud();
+    setIncomingNotification(null);
+    await respondToRiderNotification(notificationId, 'declined');
+    addRiderToast(`Delivery request declined (${reason}).`, 'info');
+  };
+
+  // Workflow: ACCEPT DELIVERY (Legacy)
   const acceptDelivery = async (deliveryObj) => {
+    playAcceptChime();
     const active = { ...deliveryObj, status: 'accepted' };
     setActiveDelivery(active);
     setIncomingRequest(null);
-    await updateOrderStatusInSupabase(deliveryObj.id, 'accepted');
+    await updateOrderStatusInSupabase(deliveryObj.id, 'accepted', profile?.id);
     addRiderToast(`Delivery #${deliveryObj.id} accepted! Head to store.`, 'success');
   };
 
-  // Workflow: DECLINE DELIVERY
+  // Workflow: DECLINE DELIVERY (Legacy)
   const declineDelivery = (deliveryId, reason) => {
+    playDeclineThud();
     setIncomingRequest(null);
     addRiderToast(`Delivery request declined (${reason}).`, 'info');
   };
@@ -377,6 +477,7 @@ export const RiderProvider = ({ children }) => {
     setIsLoggedIn(false);
     setIsOnline(false);
     setActiveDelivery(null);
+    setIncomingNotification(null);
     setProfile(INITIAL_RIDER_PROFILE);
     setEarnings(INITIAL_RIDER_EARNINGS);
     try {
@@ -397,6 +498,7 @@ export const RiderProvider = ({ children }) => {
         isOnline,
         activeDelivery,
         incomingRequest,
+        incomingNotification,
         earnings,
         history,
         profile,
@@ -405,6 +507,8 @@ export const RiderProvider = ({ children }) => {
         toasts,
         setActiveRiderTab,
         toggleAvailability,
+        acceptIncomingNotification,
+        declineIncomingNotification,
         acceptDelivery,
         declineDelivery,
         selectStoreForOrder,

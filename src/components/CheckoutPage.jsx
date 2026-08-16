@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
-import { MapPin, Clock, CreditCard, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
+import { MapPin, Clock, CreditCard, ShieldCheck, CheckCircle2, ArrowRight, Loader2, MessageSquare } from 'lucide-react';
 
 export default function CheckoutPage() {
-  const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab, customerPhone, customerName, currentLocation } = useCart();
+  const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab, customerPhone, customerName, currentLocation, isPlacingOrder } = useCart();
 
   const [address, setAddress] = useState({
     fullName: customerName && customerName !== 'Customer' ? customerName : '',
     phone: customerPhone || '',
     flat: currentLocation?.flat || '',
-    street: currentLocation?.street || currentLocation?.name || '',
+    street: currentLocation?.street || currentLocation?.area || currentLocation?.name || '',
     city: currentLocation?.city || (currentLocation?.name?.includes(',') ? currentLocation.name.split(',')[1].trim() : 'Chikkamagaluru'),
     pincode: currentLocation?.pincode || '577101'
   });
@@ -21,8 +21,14 @@ export default function CheckoutPage() {
     if (customerPhone) {
       setAddress(prev => ({ ...prev, phone: customerPhone }));
     }
-    if (currentLocation?.name) {
-      setAddress(prev => ({ ...prev, street: currentLocation.name }));
+    if (currentLocation) {
+      setAddress(prev => ({
+        ...prev,
+        flat: currentLocation.flat || prev.flat,
+        street: currentLocation.street || currentLocation.area || currentLocation.name || prev.street,
+        city: currentLocation.city || prev.city,
+        pincode: currentLocation.pincode || prev.pincode
+      }));
     }
   }, [customerName, customerPhone, currentLocation]);
 
@@ -32,10 +38,10 @@ export default function CheckoutPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="py-20 text-center space-y-4">
+      <div className="py-20 text-center space-y-4 max-w-md mx-auto">
         <h2 className="font-display text-2xl font-extrabold text-stone-900">Your cart is empty</h2>
-        <button onClick={() => setActiveTab('home')} className="py-3 px-6 bg-emerald-800 text-white font-bold rounded-xl">
-          Return to Home
+        <button onClick={() => setActiveTab('home')} className="py-3 px-6 bg-emerald-800 text-white font-bold rounded-xl shadow-md">
+          Return to Catalog
         </button>
       </div>
     );
@@ -43,12 +49,14 @@ export default function CheckoutPage() {
 
   const finalTotal = cartSubtotal + deliveryFee;
 
-  const handleCompleteCheckout = (e) => {
+  const handleCompleteCheckout = async (e) => {
     e.preventDefault();
+    if (isPlacingOrder) return;
+
     const formattedAddr = `${address.flat ? address.flat + ', ' : ''}${address.street}, ${address.city} - ${address.pincode}`.trim();
     const paymentLabel = paymentMethod === 'upi' ? `UPI (${upiApp.toUpperCase()})` : paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery';
 
-    placeOrder({
+    await placeOrder({
       fullName: address.fullName || customerName || 'Customer',
       phone: address.phone || customerPhone,
       subtotal: cartSubtotal,
@@ -250,7 +258,12 @@ export default function CheckoutPage() {
             <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 text-xs">
               {cart.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center font-semibold text-stone-800">
-                  <span className="truncate max-w-[170px]">{item.quantity}x {item.product.name}</span>
+                  <span className="truncate max-w-[170px]">
+                    {item.quantity}x {item.product.name}
+                    {!item.product.id || (typeof item.product.id === 'string' && item.product.id.length < 20) ? (
+                      <span className="text-[10px] text-amber-700 font-bold ml-1">(Manual Item)</span>
+                    ) : null}
+                  </span>
                   <span className="font-bold text-stone-900">₹{item.product.price * item.quantity}</span>
                 </div>
               ))}
@@ -273,10 +286,22 @@ export default function CheckoutPage() {
 
             <button
               type="submit"
-              className="w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 mt-2"
+              disabled={isPlacingOrder}
+              className={`w-full py-4 px-6 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 mt-2 ${
+                isPlacingOrder ? 'bg-stone-400 cursor-not-allowed' : 'bg-emerald-800 hover:bg-emerald-900'
+              }`}
             >
-              <span>CONFIRM ORDER (₹{finalTotal})</span>
-              <ArrowRight className="w-4 h-4" />
+              {isPlacingOrder ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>SAVING ORDER TO SUPABASE...</span>
+                </>
+              ) : (
+                <>
+                  <span>CONFIRM ORDER (₹{finalTotal})</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
             <p className="text-center text-[11px] text-stone-400 font-semibold flex items-center justify-center gap-1">

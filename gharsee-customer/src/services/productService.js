@@ -1,4 +1,4 @@
-import { fetchCustomerProducts } from './mock/customerService';
+import { fetchCustomerProducts } from './customerService';
 
 export async function fetchProductsByStore(storeId) {
   return await fetchCustomerProducts(storeId);

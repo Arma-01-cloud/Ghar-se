@@ -25,6 +25,7 @@ import ToastContainer from './components/ToastContainer';
 import CustomerOnboardingModal from './components/CustomerOnboardingModal';
 import ShopkeeperLayout from './shopkeeper/components/ShopkeeperLayout';
 import RiderLayout from './rider/components/RiderLayout';
+import AdminPortal from './admin/AdminPortal';
 
 function AppContent() {
   const { activeTab, isCustomerOnboardingOpen, setIsCustomerOnboardingOpen } = useCart();
@@ -50,8 +51,14 @@ function AppContent() {
   const pathVal = currentPath || window.location.pathname || '';
   const hashVal = currentHash || window.location.hash || '';
 
+  const isAdminRoute = pathVal.startsWith('/admin') || hashVal.includes('admin');
   const isRiderRoute = pathVal.startsWith('/rider') || hashVal.includes('rider');
   const isShopkeeperRoute = pathVal.startsWith('/shopkeeper') || hashVal.includes('shopkeeper');
+
+  // CENTRAL ADMIN COMMAND PORTAL ROUTE
+  if (isAdminRoute) {
+    return <AdminPortal />;
+  }
 
   // RIDER APPLICATION PORTAL ROUTE
   if (isRiderRoute) {

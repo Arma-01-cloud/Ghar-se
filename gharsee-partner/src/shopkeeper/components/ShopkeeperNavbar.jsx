@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useShopkeeper } from '../context/ShopkeeperContext';
-import { Bell, Store, ShieldCheck, LogOut, Check, AlertCircle, Info, Menu, X } from 'lucide-react';
+import { Bell, Store, LogOut, Menu } from 'lucide-react';
 
 export default function ShopkeeperNavbar({ onToggleMobileSidebar }) {
-  const { storeProfile, toggleStoreStatus, notifications, logoutShopkeeper, pendingOrders } = useShopkeeper();
+  const { storeProfile, toggleStoreStatus, notifications, logoutShopkeeper } = useShopkeeper();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -21,19 +21,29 @@ export default function ShopkeeperNavbar({ onToggleMobileSidebar }) {
         </button>
 
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-800 text-white flex items-center justify-center font-bold shadow-xs">
-            <Store className="w-5 h-5" />
-          </div>
+          {storeProfile?.image || storeProfile?.image_url ? (
+            <div className="w-10 h-10 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 shadow-xs shrink-0">
+              <img
+                src={storeProfile.image || storeProfile.image_url}
+                alt={storeProfile.name || 'Store'}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-2xl bg-emerald-800 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <Store className="w-5 h-5" />
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-display font-black text-base sm:text-lg text-stone-900 leading-tight">
-                {storeProfile.name}
+                {storeProfile?.name || 'My Grocery Store'}
               </h2>
               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider hidden sm:inline-block">
                 PARTNER PORTAL
               </span>
             </div>
-            <p className="text-[11px] text-stone-400 font-semibold">{storeProfile.ownerName} • {storeProfile.phone}</p>
+            <p className="text-[11px] text-stone-400 font-semibold">{storeProfile?.ownerName || 'Store Owner'} • {storeProfile?.phone || ''}</p>
           </div>
         </div>
       </div>

@@ -8,7 +8,7 @@ export async function fetchProductsByStore(storeId) {
   try {
     let query = supabase
       .from('products')
-      .select('*, product_variants(id, price)')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (storeId) {
@@ -27,26 +27,41 @@ export async function fetchProductsByStore(storeId) {
     }
 
     return data.map(p => {
-      const variantPrice = p.product_variants && p.product_variants.length > 0 ? p.product_variants[0].price : (p.price || 120);
+      const price = parseFloat(p.price || 0);
+      const mrp = parseFloat(p.mrp || p.price || 0);
+      const discount = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+
       return {
         id: p.id,
+        shop_id: p.shop_id,
+        storeId: p.shop_id,
         name: p.name,
-        brand: p.brand || 'GharSee Fresh',
+        brand: p.brand || 'Store Fresh',
         category: p.category || 'Groceries',
-        price: variantPrice,
-        discount: p.discount || 0,
+        price: price,
+        originalPrice: mrp,
+        mrp: mrp,
+        discount: discount,
         unit: p.unit || '1 kg',
-        stock: p.stock != null ? p.stock : 20,
-        minThreshold: 10,
+        stock: p.stock != null ? p.stock : 50,
+        minThreshold: p.min_threshold || 5,
         status: (p.stock == null || p.stock > 0) ? 'In Stock' : 'Out of Stock',
         image: p.image_url || '/images/cat_veg_fruits.jpg',
-        description: p.description || ''
+        image_url: p.image_url || '/images/cat_veg_fruits.jpg',
+        description: p.description || '',
+        rating: 4.9,
+        reviews: 18,
+        isAvailable: p.is_available !== false
       };
     });
   } catch (err) {
     console.error('Exception fetching products:', err);
     return [];
   }
+}
+
+export async function fetchCustomerProducts(storeId = null) {
+  return await fetchProductsByStore(storeId);
 }
 
 export async function addProductToSupabase(productData) {

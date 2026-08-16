@@ -138,7 +138,14 @@ export default function ShopkeeperOrderDetailModal() {
             {order.items?.map((item, idx) => (
               <div key={idx} className="p-3.5 flex items-center justify-between text-xs font-semibold">
                 <div className="space-y-0.5">
-                  <h5 className="font-bold text-stone-900">{item.name}</h5>
+                  <div className="flex items-center gap-2">
+                    <h5 className="font-bold text-stone-900">{item.name}</h5>
+                    {(item.isManual || !item.id || (typeof item.id === 'string' && item.id.length < 20)) && (
+                      <span className="bg-amber-100 text-amber-900 font-extrabold text-[10px] px-2 py-0.5 rounded-md border border-amber-300">
+                        📝 Manual Item
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-stone-400">Quantity: {item.qty || item.quantity} {item.unit || 'unit'} • ₹{item.price} each</p>
                   
                   {/* REPLACEMENT PREFERENCE */}

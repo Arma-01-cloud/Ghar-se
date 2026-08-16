@@ -7,12 +7,20 @@ import { get10DigitPhone } from '../../services/authService';
 const ShopkeeperContext = createContext();
 
 export const ShopkeeperProvider = ({ children }) => {
-  const [authUser, setAuthUser] = useState(null);
+  const [authUser, setAuthUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gharsee_shopkeeper_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   
-  // Persist isLoggedIn state
+  // Persist isLoggedIn state - only true if a valid user object exists
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
-      return localStorage.getItem('gharsee_shopkeeper_logged_in') === 'true';
+      const savedUser = localStorage.getItem('gharsee_shopkeeper_user');
+      return Boolean(savedUser && localStorage.getItem('gharsee_shopkeeper_logged_in') === 'true');
     } catch {
       return false;
     }
@@ -26,7 +34,7 @@ export const ShopkeeperProvider = ({ children }) => {
     }
   });
 
-  const [isCheckingStore, setIsCheckingStore] = useState(true);
+  const [isCheckingStore, setIsCheckingStore] = useState(false);
 
   // Store profile initialized to null (no mock Sri Lakshmi store fallback!)
   const [storeProfile, setStoreProfile] = useState(() => {
@@ -72,6 +80,10 @@ export const ShopkeeperProvider = ({ children }) => {
 
       if (matchedShop) {
         setHasStore(true);
+        const statusLower = (matchedShop.status || '').toLowerCase();
+        const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matchedShop.is_approved === false;
+        const isApproved = !isPending && statusLower !== 'rejected';
+
         const prof = {
           id: matchedShop.id,
           name: matchedShop.name,
@@ -79,7 +91,13 @@ export const ShopkeeperProvider = ({ children }) => {
           phone: matchedShop.phone || userPhone,
           email: matchedShop.email || 'store@gharsee.app',
           address: matchedShop.address || 'Chikkamagaluru, Karnataka',
-          isOpen: matchedShop.status === 'open' || matchedShop.status === 'active' || true,
+          isOpen: matchedShop.is_open ?? (matchedShop.status === 'open' || matchedShop.status === 'active'),
+          status: matchedShop.status,
+          isApproved: isApproved,
+          isPending: isPending,
+          is_approved: matchedShop.is_approved,
+          image: matchedShop.image_url || matchedShop.image || '/images/store_lakshmi.jpg',
+          image_url: matchedShop.image_url || matchedShop.image || '/images/store_lakshmi.jpg',
           ...matchedShop
         };
         setStoreProfile(prof);
@@ -103,8 +121,6 @@ export const ShopkeeperProvider = ({ children }) => {
   // Check Supabase Authentication & Store Registration on Mount
   useEffect(() => {
     async function checkShopkeeperAuthAndStore() {
-      setIsCheckingStore(true);
-
       if (!isSupabaseConfigured) {
         setIsCheckingStore(false);
         return;
@@ -116,15 +132,37 @@ export const ShopkeeperProvider = ({ children }) => {
         if (user) {
           setAuthUser(user);
           setIsLoggedIn(true);
-          try { localStorage.setItem('gharsee_shopkeeper_logged_in', 'true'); } catch {}
+          try { 
+            localStorage.setItem('gharsee_shopkeeper_logged_in', 'true'); 
+            localStorage.setItem('gharsee_shopkeeper_user', JSON.stringify(user));
+          } catch {}
           await loadUserStoreFromSupabase(user.id, user.phone || user.user_metadata?.phone);
         } else {
-          // If no active auth session, rely on local session state or reset
-          if (!localStorage.getItem('gharsee_shopkeeper_logged_in')) {
-            setIsLoggedIn(false);
-            setHasStore(false);
-            setStoreProfile(null);
+          // Check if custom mobile phone auth user was stored
+          const savedUserStr = localStorage.getItem('gharsee_shopkeeper_user');
+          if (savedUserStr) {
+            try {
+              const parsedUser = JSON.parse(savedUserStr);
+              if (parsedUser && parsedUser.phone) {
+                setAuthUser(parsedUser);
+                setIsLoggedIn(true);
+                await loadUserStoreFromSupabase(parsedUser.id, parsedUser.phone);
+                return;
+              }
+            } catch {}
           }
+
+          // No active auth session -> Show Login page
+          setAuthUser(null);
+          setIsLoggedIn(false);
+          setHasStore(false);
+          setStoreProfile(null);
+          try {
+            localStorage.removeItem('gharsee_shopkeeper_logged_in');
+            localStorage.removeItem('gharsee_shopkeeper_user');
+            localStorage.removeItem('gharsee_has_store');
+            localStorage.removeItem('gharsee_store_profile');
+          } catch {}
         }
       } catch (err) {
         console.error('Error checking shopkeeper auth:', err);
@@ -291,13 +329,14 @@ export const ShopkeeperProvider = ({ children }) => {
     setIsLoggedIn(true);
     try {
       localStorage.setItem('gharsee_shopkeeper_logged_in', 'true');
+      localStorage.setItem('gharsee_shopkeeper_user', JSON.stringify(userObj));
     } catch {}
     await loadUserStoreFromSupabase(userObj.id, userObj.phone);
   };
 
   const logoutShopkeeper = async () => {
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
+      try { await supabase.auth.signOut(); } catch {}
     }
     setAuthUser(null);
     setIsLoggedIn(false);
@@ -305,12 +344,13 @@ export const ShopkeeperProvider = ({ children }) => {
     setStoreProfile(null);
     try {
       localStorage.removeItem('gharsee_shopkeeper_logged_in');
+      localStorage.removeItem('gharsee_shopkeeper_user');
       localStorage.removeItem('gharsee_has_store');
       localStorage.removeItem('gharsee_store_profile');
       localStorage.removeItem('gharsee_shopkeeper_orders');
     } catch {}
     addShopkeeperToast('Logged out of Store Partner Portal', 'info');
-    window.location.href = '/';
+    window.location.href = '/shopkeeper';
   };
 
   return (

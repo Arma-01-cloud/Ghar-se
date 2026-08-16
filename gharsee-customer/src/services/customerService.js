@@ -71,27 +71,44 @@ export async function fetchCustomerStores(cityFilter = '') {
   return [];
 }
 
-// Real Supabase Product Fetching
+// Real Supabase Product Fetching (Store-Specific)
 export async function fetchCustomerProducts(storeId = null) {
   try {
     let query = supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (storeId && isValidUUID(storeId)) {
+    
+    if (storeId) {
       query = query.eq('shop_id', storeId);
     }
+
     const { data, error } = await query;
     if (!error && data && data.length > 0) {
-      return data.map(p => ({
-        id: p.id,
-        shop_id: p.shop_id,
-        name: p.name,
-        category: p.category || 'Groceries',
-        price: parseFloat(p.price || 0),
-        mrp: parseFloat(p.mrp || p.price || 0),
-        unit: p.unit || '1 kg',
-        stock: p.stock || 50,
-        image: p.image_url || '/images/cat_veg_fruits.jpg',
-        description: p.description || ''
-      }));
+      return data.map(p => {
+        const price = parseFloat(p.price || 0);
+        const mrp = parseFloat(p.mrp || p.price || 0);
+        const discount = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+
+        return {
+          id: p.id,
+          shop_id: p.shop_id,
+          storeId: p.shop_id,
+          name: p.name,
+          brand: 'Store Fresh',
+          category: p.category || 'Groceries',
+          price: price,
+          originalPrice: mrp,
+          mrp: mrp,
+          discount: discount,
+          unit: p.unit || '1 kg',
+          stock: p.stock != null ? p.stock : 50,
+          minThreshold: p.min_threshold || 5,
+          image: p.image_url || '/images/cat_veg_fruits.jpg',
+          image_url: p.image_url || '/images/cat_veg_fruits.jpg',
+          description: p.description || '',
+          rating: 4.9,
+          reviews: 18,
+          isAvailable: p.is_available !== false
+        };
+      });
     }
   } catch (e) {
     console.error('Error fetching products from Supabase:', e);

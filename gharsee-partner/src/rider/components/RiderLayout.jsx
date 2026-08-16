@@ -11,17 +11,49 @@ import RiderHistoryPage from './RiderHistoryPage';
 import RiderProfilePage from './RiderProfilePage';
 import RiderSettingsPage from './RiderSettingsPage';
 import RiderToastContainer from './RiderToastContainer';
+import RiderIncomingRequestModal from './RiderIncomingRequestModal';
+import RiderPendingApprovalView from './RiderPendingApprovalView';
 
 export default function RiderLayout() {
-  const { isLoggedIn, activeRiderTab } = useRider();
+  const { 
+    isLoggedIn, 
+    profile,
+    activeRiderTab, 
+    incomingNotification, 
+    acceptIncomingNotification, 
+    declineIncomingNotification,
+    logoutRider
+  } = useRider();
 
   if (!isLoggedIn) {
     return <RiderLogin />;
   }
 
+  // Rider Pending Admin Review Gate
+  const isPendingApproval = profile && (
+    profile.isPending ||
+    profile.status === 'pending_approval' ||
+    profile.status === 'pending' ||
+    profile.is_approved === false ||
+    profile.isApproved === false
+  );
+
+  if (isPendingApproval) {
+    return <RiderPendingApprovalView onLogout={logoutRider} />;
+  }
+
   return (
-    <div className="min-h-screen bg-[#FBF9F5] flex text-stone-900 font-sans pb-16 md:pb-0">
+    <div className="min-h-screen bg-[#FBF9F5] flex text-stone-900 font-sans pb-16 md:pb-0 relative">
       
+      {/* REALTIME INCOMING DELIVERY REQUEST POPUP OVERLAY */}
+      {incomingNotification && (
+        <RiderIncomingRequestModal
+          notification={incomingNotification}
+          onAccept={acceptIncomingNotification}
+          onDecline={declineIncomingNotification}
+        />
+      )}
+
       {/* DESKTOP SIDEBAR */}
       <RiderSidebar />
 

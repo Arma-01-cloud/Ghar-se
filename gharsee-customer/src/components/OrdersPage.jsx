@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import OrderDetailModal from './OrderDetailModal';
-import { Clock, Package, CheckCircle2, Truck, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { Clock, Package, CheckCircle2, Truck, ChevronRight, AlertCircle, RefreshCw, MessageSquare } from 'lucide-react';
 
 export default function OrdersPage() {
-  const { orders, setActiveTab } = useCart();
+  const { orders, setActiveTab, latestWhatsAppInfo } = useCart();
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   if (!orders || orders.length === 0) {
@@ -97,6 +97,32 @@ export default function OrdersPage() {
   return (
     <div className="py-10 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-8">
       
+      {/* WHATSAPP RE-SEND NOTIFICATION BANNER */}
+      {latestWhatsAppInfo && (
+        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-5 shadow-xl border border-emerald-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in duration-300">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-green-400 shrink-0" />
+              <span className="font-extrabold text-sm text-green-300 uppercase tracking-wider">
+                Order #{latestWhatsAppInfo.orderId} Saved in Supabase
+              </span>
+            </div>
+            <p className="text-stone-200 text-xs font-medium">
+              Product list & details prepared for shopkeeper at <strong>{latestWhatsAppInfo.storeName}</strong>.
+            </p>
+          </div>
+
+          <a
+            href={latestWhatsAppInfo.whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="py-2.5 px-5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center gap-2 transition-all shrink-0"
+          >
+            <span>💬 Send WhatsApp to Shopkeeper</span>
+          </a>
+        </div>
+      )}
+
       <div className="border-b border-stone-200 pb-4">
         <div className="flex items-center justify-between">
           <div>

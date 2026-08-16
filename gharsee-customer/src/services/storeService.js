@@ -39,7 +39,16 @@ export async function fetchStores(customerLat = 13.3161, customerLon = 75.7720, 
       return { stores: [], error: null };
     }
 
-    const liveStores = shopRows.map((s, idx) => {
+    // Only display stores that are approved by Admin and not pending/rejected
+    const approvedShopRows = shopRows.filter(s => {
+      const st = (s.status || '').toLowerCase();
+      if (st === 'pending' || st === 'pending_approval' || st === 'rejected' || s.is_approved === false) {
+        return false;
+      }
+      return true;
+    });
+
+    const liveStores = approvedShopRows.map((s, idx) => {
       const addressLower = (s.address || '').toLowerCase();
       let shopLat = s.latitude;
       let shopLon = s.longitude;
@@ -105,17 +114,28 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
 
   try {
     const storePhone = storeData.phone || storeData.shopkeeperPhone || '8123821300';
+    const storeLocality = storeData.locality || (storeData.address?.split(',')[0]?.trim()) || 'Local Area';
+    const storeCity = storeData.city || (storeData.address?.split(',')[1]?.trim()) || 'Bengaluru';
+    const storeState = storeData.state || 'Karnataka';
+    const storePincode = storeData.pincode || '';
 
     // Pure store payload WITHOUT owner_id to avoid foreign key constraints!
     const payload = {
       name: storeData.name,
       phone: storePhone,
       address: storeData.address,
+      locality: storeLocality,
+      city: storeCity,
+      state: storeState,
+      pincode: storePincode,
       password: storeData.password || null,
-      latitude: storeData.latitude || 13.3161,
-      longitude: storeData.longitude || 75.7720,
+      latitude: storeData.latitude != null ? parseFloat(storeData.latitude) : 12.9784,
+      longitude: storeData.longitude != null ? parseFloat(storeData.longitude) : 77.6408,
       rating: 5.0,
-      image_url: storeData.image || '/images/store_lakshmi.jpg'
+      is_open: false,
+      is_approved: false,
+      status: 'pending_approval',
+      image_url: storeData.image || storeData.image_url || '/images/store_lakshmi.jpg'
     };
 
     const { data, error } = await supabase
@@ -131,8 +151,15 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
         name: storeData.name,
         phone: storePhone,
         address: storeData.address,
-        latitude: storeData.latitude || 13.3161,
-        longitude: storeData.longitude || 75.7720
+        locality: storeLocality,
+        city: storeCity,
+        state: storeState,
+        pincode: storePincode,
+        latitude: storeData.latitude != null ? parseFloat(storeData.latitude) : 12.9784,
+        longitude: storeData.longitude != null ? parseFloat(storeData.longitude) : 77.6408,
+        status: 'pending_approval',
+        is_open: false,
+        image_url: storeData.image || storeData.image_url || '/images/store_lakshmi.jpg'
       };
 
       const { data: retryData, error: retryErr } = await supabase
@@ -164,10 +191,16 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
     if (updatedFields.name) payload.name = updatedFields.name;
     if (updatedFields.phone) payload.phone = updatedFields.phone;
     if (updatedFields.address) payload.address = updatedFields.address;
+    if (updatedFields.locality) payload.locality = updatedFields.locality;
+    if (updatedFields.city) payload.city = updatedFields.city;
+    if (updatedFields.state) payload.state = updatedFields.state;
+    if (updatedFields.pincode) payload.pincode = updatedFields.pincode;
     if (updatedFields.password) payload.password = updatedFields.password;
-    if (updatedFields.latitude) payload.latitude = updatedFields.latitude;
-    if (updatedFields.longitude) payload.longitude = updatedFields.longitude;
-    if (updatedFields.image) payload.image_url = updatedFields.image;
+    if (updatedFields.latitude != null) payload.latitude = parseFloat(updatedFields.latitude);
+    if (updatedFields.longitude != null) payload.longitude = parseFloat(updatedFields.longitude);
+    if (updatedFields.image || updatedFields.image_url) payload.image_url = updatedFields.image || updatedFields.image_url;
+    if (updatedFields.isOpen != null) payload.is_open = updatedFields.isOpen;
+    if (updatedFields.status) payload.status = updatedFields.status;
 
     const { error } = await supabase
       .from('shops')

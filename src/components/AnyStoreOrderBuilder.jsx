@@ -83,7 +83,7 @@ export default function AnyStoreOrderBuilder() {
         quantity: 1,
         unit: product.unit || '1 unit',
         price: product.price || 50,
-        image: product.image || '/images/cat_veg_fruits.jpg'
+        image: product.image || product.imageUrl || product.image_url || '/images/cat_veg_fruits.jpg'
       }];
     });
     addToast(`Added "${product.name}" to your grocery request!`, 'success');
@@ -244,7 +244,7 @@ export default function AnyStoreOrderBuilder() {
                     <div className="space-y-3">
                       <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square">
                         <img 
-                          src={product.image || '/images/cat_veg_fruits.jpg'} 
+                          src={product.image || product.imageUrl || product.image_url || '/images/cat_veg_fruits.jpg'} 
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                           onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}

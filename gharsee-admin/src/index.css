@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+  
+  --color-forest-900: #08241B;
+  --color-forest-800: #0E382B;
+  --color-forest-700: #134E3A;
+  --color-forest-600: #166534;
+  --color-fresh-500: #16A34A;
+  --color-fresh-400: #22C55E;
+  --color-mint-300: #86EFAC;
+  --color-mint-100: #DCFCE7;
+  --color-mint-50: #F0FDF4;
+  --color-warm-bg: #FBF9F5;
+  --color-warm-surface: #F4F0E8;
+  --color-charcoal: #111827;
+  --color-slate-muted: #4B5563;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-warm-bg);
+  color: var(--color-charcoal);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F3F0E6;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}

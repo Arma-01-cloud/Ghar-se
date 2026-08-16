@@ -96,6 +96,10 @@ export const CartProvider = ({ children }) => {
     }
   });
 
+  // Track latest order WhatsApp notification link
+  const [latestWhatsAppInfo, setLatestWhatsAppInfo] = useState(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
   const [toasts, setToasts] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [activeTab, setActiveTab] = useState('home');
@@ -186,15 +190,19 @@ export const CartProvider = ({ children }) => {
     loadNearbyStores();
   }, [currentLocation]);
 
-  // Save location
+  // Save location to localStorage and Supabase
   useEffect(() => {
     try {
       localStorage.setItem('gharsee_current_location', JSON.stringify(currentLocation));
       if (customerPhone) {
-        saveCustomerPhoneAddress(customerPhone, currentLocation);
+        saveCustomerPhoneAddress({
+          phone: customerPhone,
+          fullName: customerName,
+          ...currentLocation
+        });
       }
     } catch (e) {}
-  }, [currentLocation, customerPhone]);
+  }, [currentLocation, customerPhone, customerName]);
 
   // Save Current Store
   useEffect(() => {
@@ -232,8 +240,26 @@ export const CartProvider = ({ children }) => {
   };
 
   const setCustomerLocation = (loc) => {
-    setCurrentLocation(loc);
-    addToast(`Delivery location updated to ${loc.name}`, 'info');
+    if (!loc) return;
+    const enriched = {
+      name: loc.name || `${loc.area || ''}, ${loc.city || ''}`.trim() || 'Chikkamagaluru, Karnataka',
+      area: loc.area || (loc.name?.split(',')[0]?.trim()) || 'Local Area',
+      district: loc.district || loc.city || 'District',
+      city: loc.city || (loc.name?.split(',')[1]?.trim()) || 'Chikkamagaluru',
+      state: loc.state || 'Karnataka',
+      pincode: loc.pincode || '577101',
+      formattedAddress: loc.formattedAddress || loc.name,
+      latitude: loc.latitude || 13.3161,
+      longitude: loc.longitude || 75.7720,
+      flat: loc.flat || '',
+      street: loc.street || loc.streetAddress || '',
+      tag: loc.tag || 'Home'
+    };
+    setCurrentLocation(enriched);
+    try {
+      localStorage.setItem('gharsee_current_location', JSON.stringify(enriched));
+    } catch {}
+    addToast(`📍 Delivery location set to ${enriched.name}`, 'info');
   };
 
   const setCurrentStore = (store) => {
@@ -352,105 +378,169 @@ export const CartProvider = ({ children }) => {
     setCart([]);
   };
 
-  // Specific Store Order Placement (Persisted to Supabase with real customerName & customerPhone)
+  // Specific Store Order Placement (Persisted to Supabase with WhatsApp Notification)
   const placeOrder = async (orderDetails) => {
-    const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
-    const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
-
-    const newOrder = {
-      id: `GK-${Math.floor(10000 + Math.random() * 90000)}`,
-      fulfillment_mode: 'store_selected',
-      store_id: currentStore ? currentStore.id : null,
-      storeName: currentStore ? currentStore.name : 'Local Grocery Store',
-      customerName: cName,
-      customerPhone: phoneNum,
-      date: new Date().toISOString(),
-      items: cart.map(item => ({
-        id: item.product.id,
-        name: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
-        qty: item.quantity,
-        unit: item.product.unit || '1 unit',
-        replacementPreference: item.product.replacementPreference || 'replace_brand',
-        image: item.product.image
-      })),
-      subtotal: orderDetails.subtotal,
-      deliveryFee: orderDetails.deliveryFee,
-      discount: orderDetails.discount,
-      totalAmount: orderDetails.totalAmount,
-      status: 'pending',
-      paymentMethod: orderDetails.paymentMethod,
-      address: orderDetails.address
-    };
-
-    const updatedOrders = [newOrder, ...orders];
-    setOrders(updatedOrders);
-    try {
-      localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
-    } catch {}
-
-    clearCart();
-    await createOrderInSupabase(newOrder);
-
-    addToast(`Order #${newOrder.id} placed at ${newOrder.storeName}! 🎉`, 'success');
+    if (isPlacingOrder) return null;
+    setIsPlacingOrder(true);
 
     try {
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    } catch {}
+      const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
+      const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
 
-    setActiveTab('orders');
-    return newOrder;
+      const newOrder = {
+        id: `GK-${Math.floor(10000 + Math.random() * 90000)}`,
+        fulfillment_mode: 'store_selected',
+        store_id: currentStore ? currentStore.id : null,
+        storeName: currentStore ? currentStore.name : 'Local Grocery Store',
+        customerName: cName,
+        customerPhone: phoneNum,
+        date: new Date().toISOString(),
+        items: cart.map(item => {
+          const isUUID = item.product?.id && typeof item.product.id === 'string' && item.product.id.length > 20;
+          return {
+            id: item.product.id,
+            name: item.product.name,
+            price: item.product.price,
+            quantity: item.quantity,
+            qty: item.quantity,
+            unit: item.product.unit || '1 unit',
+            replacementPreference: item.product.replacementPreference || 'replace_brand',
+            image: item.product.image,
+            isManual: !isUUID
+          };
+        }),
+        subtotal: orderDetails.subtotal,
+        deliveryFee: orderDetails.deliveryFee,
+        discount: orderDetails.discount,
+        totalAmount: orderDetails.totalAmount,
+        status: 'pending',
+        paymentMethod: orderDetails.paymentMethod,
+        address: orderDetails.address
+      };
+
+      // 1. Create order in Supabase & lookup authoratative Customer / Shopkeeper database details
+      const res = await createOrderInSupabase(newOrder);
+
+      const savedOrder = res?.order || newOrder;
+      const updatedOrders = [savedOrder, ...orders];
+      setOrders(updatedOrders);
+      try {
+        localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
+      } catch {}
+
+      clearCart();
+
+      // 2. Set WhatsApp info for resend option
+      if (res?.whatsappUrl) {
+        setLatestWhatsAppInfo({
+          orderId: savedOrder.id,
+          storeName: savedOrder.storeName || savedOrder.store_name,
+          whatsappUrl: res.whatsappUrl,
+          shopkeeperPhone: res.shopkeeperPhone
+        });
+
+        // Automatically trigger WhatsApp in new tab
+        try {
+          window.open(res.whatsappUrl, '_blank');
+        } catch (e) {
+          console.log('Browser blocked popup opening:', e);
+        }
+      }
+
+      addToast(`Order #${savedOrder.id} placed & sent to ${savedOrder.storeName}! 💬`, 'success');
+
+      try {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      } catch {}
+
+      setActiveTab('orders');
+      setIsPlacingOrder(false);
+      return savedOrder;
+    } catch (err) {
+      console.error('Error placing order:', err);
+      setIsPlacingOrder(false);
+      return null;
+    }
   };
 
   // "Shop From Any Store" Custom Order Placement
   const placeAnyStoreOrder = async (groceryListItems, orderDetails) => {
-    const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
-    const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
-
-    const newOrder = {
-      id: `GS-${Math.floor(10000 + Math.random() * 90000)}`,
-      fulfillment_mode: 'shop_any_store',
-      store_id: null,
-      storeName: 'Store Selection Pending (Rider Will Select)',
-      customerName: cName,
-      customerPhone: phoneNum,
-      date: new Date().toISOString(),
-      items: groceryListItems.map(item => ({
-        id: item.id,
-        name: item.name || item.itemName,
-        price: item.price || 50,
-        quantity: item.quantity || 1,
-        qty: item.quantity || 1,
-        unit: item.unit || item.quantityUnit || '1 unit',
-        replacementPreference: item.replacementPreference || 'replace_brand',
-        image: '/images/cat_veg_fruits.jpg'
-      })),
-      subtotal: orderDetails.subtotal,
-      deliveryFee: orderDetails.deliveryFee,
-      discount: 0,
-      totalAmount: orderDetails.totalAmount,
-      status: 'pending',
-      paymentMethod: orderDetails.paymentMethod || 'Cash on Delivery',
-      address: orderDetails.address
-    };
-
-    const updatedOrders = [newOrder, ...orders];
-    setOrders(updatedOrders);
-    try {
-      localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
-    } catch {}
-
-    await createOrderInSupabase(newOrder);
-
-    addToast(`Custom order #${newOrder.id} placed! A nearby partner will fulfill it. 🛒`, 'success');
+    if (isPlacingOrder) return null;
+    setIsPlacingOrder(true);
 
     try {
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    } catch {}
+      const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
+      const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
 
-    setActiveTab('orders');
-    return newOrder;
+      const newOrder = {
+        id: `GS-${Math.floor(10000 + Math.random() * 90000)}`,
+        fulfillment_mode: 'shop_any_store',
+        store_id: currentStore ? currentStore.id : null,
+        storeName: currentStore ? currentStore.name : 'Local Grocery Store',
+        customerName: cName,
+        customerPhone: phoneNum,
+        date: new Date().toISOString(),
+        items: groceryListItems.map(item => {
+          const isUUID = item.id && typeof item.id === 'string' && item.id.length > 20;
+          return {
+            id: item.id,
+            name: item.name || item.itemName,
+            price: item.price || 50,
+            quantity: item.quantity || 1,
+            qty: item.quantity || 1,
+            unit: item.unit || item.quantityUnit || '1 unit',
+            replacementPreference: item.replacementPreference || 'replace_brand',
+            image: '/images/cat_veg_fruits.jpg',
+            isManual: !isUUID
+          };
+        }),
+        subtotal: orderDetails.subtotal,
+        deliveryFee: orderDetails.deliveryFee,
+        discount: 0,
+        totalAmount: orderDetails.totalAmount,
+        status: 'pending',
+        paymentMethod: orderDetails.paymentMethod || 'Cash on Delivery',
+        address: orderDetails.address
+      };
+
+      const res = await createOrderInSupabase(newOrder);
+
+      const savedOrder = res?.order || newOrder;
+      const updatedOrders = [savedOrder, ...orders];
+      setOrders(updatedOrders);
+      try {
+        localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
+      } catch {}
+
+      if (res?.whatsappUrl) {
+        setLatestWhatsAppInfo({
+          orderId: savedOrder.id,
+          storeName: savedOrder.storeName || savedOrder.store_name,
+          whatsappUrl: res.whatsappUrl,
+          shopkeeperPhone: res.shopkeeperPhone
+        });
+
+        try {
+          window.open(res.whatsappUrl, '_blank');
+        } catch (e) {
+          console.log('Browser blocked popup opening:', e);
+        }
+      }
+
+      addToast(`Custom order #${savedOrder.id} placed & sent to Shopkeeper WhatsApp! 🛒`, 'success');
+
+      try {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      } catch {}
+
+      setActiveTab('orders');
+      setIsPlacingOrder(false);
+      return savedOrder;
+    } catch (err) {
+      console.error('Error placing custom order:', err);
+      setIsPlacingOrder(false);
+      return null;
+    }
   };
 
   const toggleWishlist = productId => {
@@ -491,6 +581,8 @@ export const CartProvider = ({ children }) => {
         selectedStoreId,
         selectedProduct,
         storeConflictModal,
+        latestWhatsAppInfo,
+        isPlacingOrder,
         cartSubtotal,
         totalItemCount,
         deliveryFee,

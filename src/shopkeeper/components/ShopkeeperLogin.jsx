@@ -104,6 +104,32 @@ export default function ShopkeeperLogin() {
           </p>
         </div>
 
+        {/* SEGMENTED TAB SWITCH: LOGIN vs SIGNUP */}
+        <div className="grid grid-cols-2 p-1.5 bg-stone-100 rounded-2xl gap-1">
+          <button
+            type="button"
+            onClick={() => { setMode('login'); setErrorMsg(null); }}
+            className={`py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+              mode === 'login'
+                ? 'bg-white text-emerald-950 shadow-sm'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            Sign In / Login
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('signup'); setErrorMsg(null); }}
+            className={`py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+              mode === 'signup'
+                ? 'bg-white text-emerald-950 shadow-sm'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            New Partner Register
+          </button>
+        </div>
+
         {/* ERROR BANNER */}
         {errorMsg && (
           <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-xs font-bold flex items-start gap-2.5 shadow-2xs">

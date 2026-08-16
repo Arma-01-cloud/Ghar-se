@@ -12,6 +12,7 @@ import ShopkeeperSalesPage from './ShopkeeperSalesPage';
 import ShopkeeperStorePage from './ShopkeeperStorePage';
 import ShopkeeperSettingsPage from './ShopkeeperSettingsPage';
 import ShopkeeperToastContainer from './ShopkeeperToastContainer';
+import ShopkeeperPendingApprovalView from './ShopkeeperPendingApprovalView';
 import { Loader2, Store, AlertCircle, RefreshCw } from 'lucide-react';
 
 class ShopkeeperErrorBoundary extends Component {
@@ -62,7 +63,7 @@ class ShopkeeperErrorBoundary extends Component {
 }
 
 function ShopkeeperLayoutInner() {
-  const { isLoggedIn, hasStore, isCheckingStore, activeShopkeeperTab, setActiveShopkeeperTab, setSelectedOrderId } = useShopkeeper();
+  const { isLoggedIn, hasStore, storeProfile, isCheckingStore, activeShopkeeperTab, setActiveShopkeeperTab, setSelectedOrderId, logoutShopkeeper } = useShopkeeper();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Check URL params for embedded orderId from WhatsApp link
@@ -125,7 +126,24 @@ function ShopkeeperLayoutInner() {
     );
   }
 
-  // 3. CASE 2 — SHOPKEEPER ALREADY HAS A STORE: DASHBOARD PORTAL
+  // 2.5. CASE 1.5 — STORE EXISTS BUT IS PENDING ADMIN REVIEW & ACCEPTANCE
+  const isPendingApproval = storeProfile && (
+    storeProfile.isPending ||
+    storeProfile.status === 'pending_approval' ||
+    storeProfile.status === 'pending' ||
+    storeProfile.is_approved === false ||
+    storeProfile.isApproved === false
+  );
+
+  if (hasStore && isPendingApproval) {
+    return (
+      <ShopkeeperPendingApprovalView 
+        onLogout={logoutShopkeeper} 
+      />
+    );
+  }
+
+  // 3. CASE 2 — SHOPKEEPER STORE IS APPROVED & ACTIVE: FULL DASHBOARD PORTAL
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-stone-900 font-sans">
       
