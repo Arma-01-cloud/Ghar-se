@@ -17,7 +17,7 @@ export default function OrdersPage() {
           You haven't placed any orders yet.
         </h2>
         <p className="text-stone-500 text-sm">
-          Browse our fresh catalog or upload your handwritten grocery shopping list to place your first express order.
+          Browse our fresh catalog or upload your handwritten grocery shopping list to place your first order.
         </p>
         <button
           onClick={() => setActiveTab('stores')}
@@ -126,7 +126,7 @@ export default function OrdersPage() {
       <div className="border-b border-stone-200 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl font-extrabold text-stone-900">Your Express Orders</h1>
+            <h1 className="font-display text-3xl font-extrabold text-stone-900">Your Orders</h1>
             <p className="text-stone-500 text-sm mt-0.5">Real-time live order tracking synced with Supabase marketplace</p>
           </div>
           <span className="bg-emerald-100 text-emerald-900 font-extrabold text-xs px-3 py-1 rounded-xl">
@@ -175,8 +175,8 @@ export default function OrdersPage() {
                   <h4 className="font-extrabold text-xs text-stone-900">
                     {order.storeName || 'Local Grocery Store'}
                   </h4>
-                  <p className="text-[11px] text-stone-500 font-semibold">
-                    {order.items?.length || 1} items total • {order.address || 'Chikkamagaluru'}
+                  <p className="text-[11px] text-stone-500 font-semibold truncate max-w-[200px] sm:max-w-xs">
+                    {order.items?.length || 1} items • 📍 {order.address || order.deliveryAddress || 'Doorstep Delivery'}
                   </p>
                 </div>
               </div>

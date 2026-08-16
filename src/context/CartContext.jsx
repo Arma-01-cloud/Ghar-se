@@ -102,9 +102,16 @@ export const CartProvider = ({ children }) => {
 
   const [toasts, setToasts] = useState([]);
   const [wishlist, setWishlist] = useState([]);
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTabState] = useState('home');
   const [selectedStoreId, setSelectedStoreId] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const setActiveTab = (tab) => {
+    if (tab !== 'store-detail') {
+      setSelectedStoreId(null);
+    }
+    setActiveTabState(tab);
+  };
 
   const setCustomerName = (nameVal) => {
     setCustomerNameState(nameVal);
@@ -447,7 +454,7 @@ export const CartProvider = ({ children }) => {
         }
       }
 
-      addToast(`Order #${savedOrder.id} placed & sent to ${savedOrder.storeName}! 💬`, 'success');
+      addToast(`Order #${savedOrder.id} placed! Delivery will be done after 4:00 PM 💬`, 'success');
 
       try {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -475,8 +482,8 @@ export const CartProvider = ({ children }) => {
       const newOrder = {
         id: `GS-${Math.floor(10000 + Math.random() * 90000)}`,
         fulfillment_mode: 'shop_any_store',
-        store_id: currentStore ? currentStore.id : null,
-        storeName: currentStore ? currentStore.name : 'Local Grocery Store',
+        store_id: null,
+        storeName: 'Shop From Any Store (Rider Choice)',
         customerName: cName,
         customerPhone: phoneNum,
         date: new Date().toISOString(),
@@ -490,7 +497,7 @@ export const CartProvider = ({ children }) => {
             qty: item.quantity || 1,
             unit: item.unit || item.quantityUnit || '1 unit',
             replacementPreference: item.replacementPreference || 'replace_brand',
-            image: '/images/cat_veg_fruits.jpg',
+            image: item.image || '/images/cat_veg_fruits.jpg',
             isManual: !isUUID
           };
         }),
@@ -512,22 +519,7 @@ export const CartProvider = ({ children }) => {
         localStorage.setItem('gharsee_customer_orders', JSON.stringify(updatedOrders));
       } catch {}
 
-      if (res?.whatsappUrl) {
-        setLatestWhatsAppInfo({
-          orderId: savedOrder.id,
-          storeName: savedOrder.storeName || savedOrder.store_name,
-          whatsappUrl: res.whatsappUrl,
-          shopkeeperPhone: res.shopkeeperPhone
-        });
-
-        try {
-          window.open(res.whatsappUrl, '_blank');
-        } catch (e) {
-          console.log('Browser blocked popup opening:', e);
-        }
-      }
-
-      addToast(`Custom order #${savedOrder.id} placed & sent to Shopkeeper WhatsApp! 🛒`, 'success');
+      addToast(`Order #${savedOrder.id} placed! Delivery will be done after 4:00 PM 🛵`, 'success');
 
       try {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -555,8 +547,8 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const totalItemCount = cart.reduce((count, item) => count + item.quantity, 0);
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.product?.price || item.price || 0) * (item.quantity || 1), 0);
+  const totalItemCount = cart.reduce((count, item) => count + (item.quantity || 1), 0);
   const deliveryFee = cartSubtotal >= 499 || cartSubtotal === 0 ? 0 : 49;
 
   return (
@@ -569,6 +561,7 @@ export const CartProvider = ({ children }) => {
         isCustomerOnboardingOpen,
         setIsCustomerOnboardingOpen,
         cart,
+        setCart,
         orders,
         toasts,
         wishlist,

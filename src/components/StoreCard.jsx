@@ -96,7 +96,7 @@ export default function StoreCard({ store, onSelectStore }) {
           </span>
           <span>•</span>
           <span className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-emerald-700" /> {store.deliveryTime || '15-25 min'}
+            <Clock className="w-3.5 h-3.5 text-emerald-700" /> {store.deliveryTime || 'Delivery after 4:00 PM'}
           </span>
         </div>
 

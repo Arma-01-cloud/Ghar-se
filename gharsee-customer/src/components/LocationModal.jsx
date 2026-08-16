@@ -245,7 +245,7 @@ export default function LocationModal({ isOpen, onClose, currentLocation, onSele
                 Select Delivery Location
               </h2>
               <p className="text-stone-500 text-xs font-medium">
-                Pinpoint your address for instant grocery delivery in 10-20 min
+                Pinpoint your address for grocery delivery after 4:00 PM
               </p>
             </div>
           </div>
@@ -487,7 +487,7 @@ export default function LocationModal({ isOpen, onClose, currentLocation, onSele
                     <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                       DELIVERY ADDRESS DETAILS
                     </span>
-                    <span className="text-xs font-bold text-stone-400">⚡ 10-20 min</span>
+                    <span className="text-xs font-bold text-stone-400">⚡ Delivery after 4:00 PM</span>
                   </div>
                   <h3 className="font-display font-extrabold text-stone-900 text-base">
                     {activeLocation.area}, {activeLocation.city}

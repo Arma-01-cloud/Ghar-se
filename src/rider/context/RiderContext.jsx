@@ -306,7 +306,7 @@ export const RiderProvider = ({ children }) => {
                     paymentStatus: newOrder.payment_method || 'Cash on Delivery',
                     estimatedEarnings: 65,
                     distance: '1.8 km',
-                    estimatedTime: '15-20 min'
+                    estimatedTime: 'Delivery after 4:00 PM'
                   }
                 };
 
@@ -362,21 +362,30 @@ export const RiderProvider = ({ children }) => {
 
   // Workflow: ACCEPT REALTIME NOTIFICATION POPUP (FIRST-ACCEPT-WINS IN SUPABASE)
   const acceptIncomingNotification = async (notificationObj) => {
-    playAcceptChime();
     const payload = notificationObj.payload || {};
     const orderId = payload.orderId || notificationObj.order_id;
 
-    // 1. Update rider_notifications row to accepted if DB notification ID exists
+    // 1. Atomic first-accept-wins claim in Supabase
+    const claimRes = await claimRiderOrderInSupabase(orderId, profile?.id, profile?.name);
+    if (!claimRes.success && claimRes.reason === 'ALREADY_CLAIMED') {
+      playDeclineThud();
+      setIncomingNotification(null);
+      setIncomingRequest(null);
+      addRiderToast('⚠️ This delivery was already accepted by another partner.', 'error');
+      return;
+    }
+
+    playAcceptChime();
+
+    // 2. Update rider_notifications row to accepted if DB notification ID exists
     if (notificationObj.id && !notificationObj.id.startsWith('order-notif-')) {
       await respondToRiderNotification(notificationObj.id, 'accepted');
     }
 
-    // 2. Update orders table in Supabase (status -> accepted, rider_id -> profile.id)
-    await updateOrderStatusInSupabase(orderId, 'accepted', profile?.id);
-
     // 3. Set Active Delivery State with full Supabase details
     const activeObj = {
       id: orderId,
+      store_id: payload.storeId || payload.store_id,
       storeName: payload.storeName || 'Local Grocery Store',
       storePhone: payload.storePhone || '+91 81238 21300',
       storeAddress: payload.storeAddress || 'Market Road, Chikkamagaluru',
@@ -384,18 +393,21 @@ export const RiderProvider = ({ children }) => {
       customerPhone: payload.customerPhone || 'Phone not provided',
       deliveryAddress: payload.deliveryAddress || 'Chikkamagaluru, Karnataka',
       distance: payload.distance || '1.8 km',
-      estimatedTime: payload.estimatedTime || '15-20 min',
+      estimatedTime: payload.estimatedTime || 'Delivery after 4:00 PM',
       items: payload.items || ['Grocery Items'],
-      itemCount: payload.itemCount || 1,
-      estimatedEarnings: payload.estimatedEarnings || 65,
+      parsedItems: payload.parsedItems || [],
+      itemCount: payload.itemCount || (payload.items ? payload.items.length : 1),
+      estimatedEarnings: payload.estimatedEarnings || (payload.isAnyStore ? 85 : 65),
       paymentStatus: payload.paymentStatus || 'Cash on Delivery',
+      fulfillment_mode: payload.fulfillment_mode || (payload.isAnyStore ? 'shop_any_store' : 'store_selected'),
+      isAnyStore: payload.isAnyStore || payload.fulfillment_mode === 'shop_any_store',
       status: 'accepted'
     };
 
     setActiveDelivery(activeObj);
     setIncomingNotification(null);
     setIncomingRequest(null);
-    addRiderToast(`🎉 Order #${orderId} claimed! Head to pickup store.`, 'success');
+    addRiderToast(`🎉 Order #${orderId} claimed! Product list loaded for store pickup.`, 'success');
   };
 
   // Workflow: DECLINE REALTIME NOTIFICATION POPUP
@@ -410,12 +422,19 @@ export const RiderProvider = ({ children }) => {
 
   // Workflow: ACCEPT DELIVERY (Legacy)
   const acceptDelivery = async (deliveryObj) => {
+    const claimRes = await claimRiderOrderInSupabase(deliveryObj.id, profile?.id, profile?.name);
+    if (!claimRes.success && claimRes.reason === 'ALREADY_CLAIMED') {
+      playDeclineThud();
+      setIncomingRequest(null);
+      addRiderToast('⚠️ This delivery was already accepted by another partner.', 'error');
+      return;
+    }
+
     playAcceptChime();
     const active = { ...deliveryObj, status: 'accepted' };
     setActiveDelivery(active);
     setIncomingRequest(null);
-    await updateOrderStatusInSupabase(deliveryObj.id, 'accepted', profile?.id);
-    addRiderToast(`Delivery #${deliveryObj.id} accepted! Head to store.`, 'success');
+    addRiderToast(`Delivery #${deliveryObj.id} accepted! Product list ready for pickup.`, 'success');
   };
 
   // Workflow: DECLINE DELIVERY (Legacy)

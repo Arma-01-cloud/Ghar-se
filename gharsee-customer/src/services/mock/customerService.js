@@ -17,7 +17,7 @@ export const MOCK_STORES = [
     openingTime: '07:00 AM',
     closingTime: '10:00 PM',
     distance: '~1.2 km away',
-    deliveryTime: '15-25 min',
+    deliveryTime: 'Delivery after 4:00 PM',
     image: '/images/store_lakshmi.jpg',
     categories: ['Groceries', 'Vegetables', 'Dairy', 'Rice & Grains']
   },
@@ -36,7 +36,7 @@ export const MOCK_STORES = [
     openingTime: '08:00 AM',
     closingTime: '09:30 PM',
     distance: '~0.8 km away',
-    deliveryTime: '12-20 min',
+    deliveryTime: 'Delivery after 4:00 PM',
     image: '/images/store_freshmart.jpg',
     categories: ['Groceries', 'Fruits & Veggies', 'Organic', 'Snacks']
   }

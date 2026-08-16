@@ -47,13 +47,25 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
     }
 
     // 3. Prepare rich notification payload JSONB
-    const itemsList = Array.isArray(orderData.items)
-      ? orderData.items.map(i => `${i.name || i.itemName || 'Item'} (${i.quantity || i.qty || 1} ${i.unit || 'unit'})`)
+    const parsedItems = Array.isArray(orderData.items)
+      ? orderData.items.map(i => typeof i === 'string' ? { name: i, quantity: 1, unit: '1 unit', price: 0 } : {
+          name: i.name || i.product_name || i.itemName,
+          quantity: i.quantity || i.qty || 1,
+          unit: i.unit || i.quantityUnit || '1 unit',
+          price: i.price || 0,
+          isManual: i.isManual || !i.product_id
+        })
+      : [];
+
+    const itemsList = parsedItems.length > 0
+      ? parsedItems.map(i => `${i.name} (${i.quantity} ${i.unit})`)
       : ['Grocery Items'];
+
+    const isAnyStore = orderData.fulfillment_mode === 'shop_any_store' || !orderData.store_id;
 
     const payload = {
       orderId: orderData.id,
-      storeName,
+      storeName: isAnyStore ? 'Shop From Any Store (Rider Selects Shop)' : storeName,
       storePhone,
       storeAddress,
       customerName: orderData.customer_name || orderData.customerName || 'Customer',
@@ -61,11 +73,14 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
       deliveryAddress: orderData.delivery_address || orderData.address || 'Chikkamagaluru, Karnataka',
       itemCount: itemsList.length,
       items: itemsList,
+      parsedItems: parsedItems,
+      fulfillment_mode: isAnyStore ? 'shop_any_store' : 'store_selected',
+      isAnyStore: isAnyStore,
       totalAmount: orderData.total_amount || orderData.totalAmount || orderData.total || 0,
       paymentStatus: orderData.payment_method || orderData.paymentMethod || 'Cash on Delivery',
-      estimatedEarnings: 65,
+      estimatedEarnings: isAnyStore ? 85 : 65, // Higher payout for multi-store delivery!
       distance: '1.8 km',
-      estimatedTime: '15-20 min'
+      estimatedTime: 'Delivery after 4:00 PM'
     };
 
     // 4. Create a rider_notifications row for each online rider

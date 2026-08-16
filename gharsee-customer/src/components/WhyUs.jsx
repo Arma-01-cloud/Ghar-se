@@ -10,8 +10,8 @@ export default function WhyUs() {
     },
     {
       icon: Clock,
-      title: '15-Minute Darkstores',
-      desc: 'Micro-warehouses located within 2 km of your neighborhood ensure hyper-fast 15-minute door delivery.'
+      title: 'Scheduled Evening Delivery',
+      desc: 'Orders are fulfilled from local neighborhood stores with guaranteed doorstep delivery done after 4:00 PM.'
     },
     {
       icon: ScanLine,

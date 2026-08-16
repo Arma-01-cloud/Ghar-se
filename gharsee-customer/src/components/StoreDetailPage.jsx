@@ -12,6 +12,7 @@ import {
 export default function StoreDetailPage() {
   const { 
     selectedStoreId, 
+    setSelectedStoreId,
     currentStore, 
     setCurrentStore, 
     favoriteStores, 
@@ -34,6 +35,18 @@ export default function StoreDetailPage() {
   const handleSelectThisStore = () => {
     setCurrentStore(store);
   };
+
+  const handleBackToStores = () => {
+    setSelectedStoreId(null);
+    setActiveTab('stores');
+  };
+
+  // Reset selected store id on cleanup when leaving this store detail view
+  useEffect(() => {
+    return () => {
+      if (setSelectedStoreId) setSelectedStoreId(null);
+    };
+  }, [setSelectedStoreId]);
 
   // Fetch store-specific products from Supabase
   useEffect(() => {
@@ -87,7 +100,7 @@ export default function StoreDetailPage() {
       {/* BACK LINK & CURRENT STORE INDICATOR */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => setActiveTab('stores')}
+          onClick={handleBackToStores}
           className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:underline cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Stores
@@ -182,7 +195,7 @@ export default function StoreDetailPage() {
               <div className="border-l border-stone-200 pl-4">
                 <span className="text-[10px] text-stone-400 font-bold block uppercase">Delivery</span>
                 <span className="font-black text-base text-emerald-950 flex items-center gap-1 justify-center">
-                  <Clock className="w-4 h-4 text-emerald-700" /> {store.deliveryTime || '15-25 min'}
+                  <Clock className="w-4 h-4 text-emerald-700" /> {store.deliveryTime || 'Delivery after 4:00 PM'}
                 </span>
               </div>
             </div>

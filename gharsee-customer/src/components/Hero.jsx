@@ -20,7 +20,7 @@ export default function Hero() {
           <div className="lg:col-span-7 space-y-5 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs sm:text-sm font-semibold tracking-wide backdrop-blur-xs">
               <Sparkles className="w-4 h-4 text-emerald-400" />
-              <span>Fresh groceries. Express delivery.</span>
+              <span>Fresh groceries. Delivered after 4:00 PM.</span>
             </div>
 
             <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
@@ -38,9 +38,9 @@ export default function Hero() {
               <div className="flex flex-col items-center lg:items-start gap-1">
                 <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-sm">
                   <Zap className="w-4 h-4 text-amber-400" />
-                  <span>15-Min Delivery</span>
+                  <span>Delivery after 4:00 PM</span>
                 </div>
-                <span className="text-[11px] text-emerald-200/70">Express hyper-local</span>
+                <span className="text-[11px] text-emerald-200/70">Evening doorstep delivery</span>
               </div>
 
               <div className="flex flex-col items-center lg:items-start gap-1">

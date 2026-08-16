@@ -7,7 +7,7 @@ export const INITIAL_DELIVERY_REQUESTS = [
     customerPhone: '+91 98765 43210',
     deliveryAddress: 'Flat 402, Green Meadows Apartment, 100 Feet Road, Indiranagar, Bengaluru - 560038',
     distance: '3.4 km',
-    estimatedTime: '18 min',
+    estimatedTime: 'Delivery after 4:00 PM',
     estimatedEarnings: 82,
     itemCount: 7,
     items: [

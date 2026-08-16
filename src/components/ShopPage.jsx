@@ -58,7 +58,7 @@ export default function ShopPage({ searchQuery, onSearchQuery, selectedCategory,
             Explore All Groceries
           </h1>
           <p className="text-stone-500 text-sm mt-1">
-            Showing <strong className="text-emerald-800">{filteredProducts.length}</strong> fresh products ready for express delivery
+            Showing <strong className="text-emerald-800">{filteredProducts.length}</strong> fresh products ready for delivery after 4:00 PM
           </p>
         </div>
 

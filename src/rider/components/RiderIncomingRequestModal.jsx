@@ -104,7 +104,7 @@ export default function RiderIncomingRequestModal({ notification, onAccept, onDe
           <div className="text-right space-y-0.5 text-xs font-bold text-stone-200">
             <div className="flex items-center gap-1 justify-end text-emerald-300">
               <Clock className="w-3.5 h-3.5" />
-              <span>{payload.estimatedTime || '15-20 min'}</span>
+              <span>{payload.estimatedTime || 'Delivery after 4:00 PM'}</span>
             </div>
             <div className="flex items-center gap-1 justify-end text-stone-400 text-[11px]">
               <MapPin className="w-3.5 h-3.5 text-amber-400" />
@@ -143,11 +143,25 @@ export default function RiderIncomingRequestModal({ notification, onAccept, onDe
         </div>
 
         {/* ITEMS PREVIEW */}
-        <div className="flex items-center justify-between bg-stone-900/90 px-4 py-2.5 rounded-xl border border-stone-800 text-xs">
-          <span className="text-stone-400 font-medium">Order Package:</span>
-          <span className="font-extrabold text-stone-200">
-            {payload.itemCount || 1} Items ({payload.paymentStatus || 'Cash on Delivery'})
-          </span>
+        <div className="bg-stone-900/90 p-3 rounded-xl border border-stone-800 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-stone-400 font-bold uppercase text-[10px] tracking-wider">
+              Items to Pick ({payload.itemCount || (payload.items ? payload.items.length : 1)})
+            </span>
+            <span className="font-extrabold text-emerald-400 text-[11px]">
+              {payload.paymentStatus || 'Cash on Delivery'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+            {payload.items && payload.items.map((itemStr, idx) => (
+              <span 
+                key={idx} 
+                className="bg-stone-800/90 border border-stone-700 text-stone-200 text-[11px] font-bold px-2 py-0.5 rounded-lg"
+              >
+                {typeof itemStr === 'string' ? itemStr : `${itemStr.name} (${itemStr.quantity} ${itemStr.unit})`}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* ACTION BUTTONS: DECLINE / ACCEPT */}

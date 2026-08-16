@@ -64,7 +64,7 @@ export async function mockFetchRiderDeliveries() {
       customerPhone: '+919876543210',
       deliveryAddress: '100 Feet Road, Indiranagar, Bengaluru',
       distance: '1.2 km',
-      estimatedTime: '15-20 min',
+      estimatedTime: 'Delivery after 4:00 PM',
       estimatedEarnings: 65,
       paymentStatus: 'Paid Online',
       status: 'pending'

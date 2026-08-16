@@ -13,6 +13,6 @@ export const INITIAL_STORE_PROFILE = {
   address: '100 Feet Road, Indiranagar, Bengaluru - 560038',
   deliveryRadius: '3.5 km',
   minOrder: '₹100',
-  estimatedDeliveryTime: '15-25 min',
+  estimatedDeliveryTime: 'Delivery after 4:00 PM',
   categories: ['Groceries', 'Dairy & Eggs', 'Rice & Grains', 'Cooking Essentials', 'Household']
 };

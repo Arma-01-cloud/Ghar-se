@@ -50,7 +50,7 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
       paymentStatus: orderData.payment_method || orderData.paymentMethod || 'Cash on Delivery',
       estimatedEarnings: 65,
       distance: '1.8 km',
-      estimatedTime: '15-20 min'
+      estimatedTime: 'Delivery after 4:00 PM'
     };
 
     const notificationRows = onlineRiders.map(rider => ({

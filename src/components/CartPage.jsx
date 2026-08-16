@@ -98,8 +98,8 @@ export default function CartPage() {
             <div className="flex items-center justify-between text-xs sm:text-sm font-bold">
               <span>
                 {freeShippingNeeded === 0 
-                  ? '🎉 Congratulations! You unlocked FREE Express Delivery!' 
-                  : `Add ₹${freeShippingNeeded} more to unlock FREE Express Delivery`}
+                  ? '🎉 Congratulations! You unlocked FREE Delivery!' 
+                  : `Add ₹${freeShippingNeeded} more to unlock FREE Delivery`}
               </span>
               <span className="text-emerald-300 font-extrabold">{Math.floor(freeShippingProgress)}%</span>
             </div>

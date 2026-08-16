@@ -94,7 +94,7 @@ export async function fetchStores(customerLat = 13.3161, customerLon = 75.7720, 
         categories: s.categories || ['Groceries', 'Dairy & Eggs', 'Rice & Grains', 'Cooking Essentials'],
         distanceKm: distKm,
         distance: `~${distKm} km away`,
-        deliveryTime: `${estMinutes}-${estMinutes + 10} min`
+        deliveryTime: 'Delivery after 4:00 PM'
       };
     });
 

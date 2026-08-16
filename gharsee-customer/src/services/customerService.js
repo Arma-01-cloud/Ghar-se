@@ -36,7 +36,7 @@ export async function fetchCustomerStores(cityFilter = '') {
         categories: s.categories && s.categories.length > 0 ? s.categories : ['Groceries', 'Dairy', 'Vegetables', 'Rice & Grains'],
         image: s.image_url || '/images/store_lakshmi.jpg',
         distance: '~1.2 km away',
-        deliveryTime: '15-25 min'
+        deliveryTime: 'Delivery after 4:00 PM'
       }));
     }
   } catch (e) {
@@ -63,7 +63,7 @@ export async function fetchCustomerStores(cityFilter = '') {
         categories: s.categories && s.categories.length > 0 ? s.categories : ['Groceries', 'Dairy', 'Vegetables', 'Rice & Grains'],
         image: s.image_url || '/images/store_lakshmi.jpg',
         distance: '~1.2 km away',
-        deliveryTime: '15-25 min'
+        deliveryTime: 'Delivery after 4:00 PM'
       }));
     }
   } catch (e) {}

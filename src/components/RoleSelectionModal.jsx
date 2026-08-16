@@ -203,7 +203,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
               </div>
               <div>
                 <h4 className="font-display font-black text-base text-stone-900">👤 Customer</h4>
-                <p className="text-stone-500 text-xs mt-0.5">Order groceries from local neighborhood stores & get express delivery.</p>
+                <p className="text-stone-500 text-xs mt-0.5">Order groceries from local neighborhood stores with delivery after 4:00 PM.</p>
               </div>
             </button>
 

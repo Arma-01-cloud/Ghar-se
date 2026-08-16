@@ -37,7 +37,7 @@ export default function LocalStoresSection() {
             Shop From Your Favorite Store
           </h2>
           <p className="text-stone-500 text-xs sm:text-sm mt-0.5">
-            Choose a local store near you and get your groceries delivered in 15-25 minutes.
+            Choose a local store near you with delivery done after 4:00 PM.
           </p>
         </div>
 

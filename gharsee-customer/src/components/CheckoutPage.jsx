@@ -5,13 +5,22 @@ import { MapPin, Clock, CreditCard, ShieldCheck, CheckCircle2, ArrowRight, Loade
 export default function CheckoutPage() {
   const { cart, cartSubtotal, deliveryFee, placeOrder, setActiveTab, customerPhone, customerName, currentLocation, isPlacingOrder } = useCart();
 
-  const [address, setAddress] = useState({
-    fullName: customerName && customerName !== 'Customer' ? customerName : '',
-    phone: customerPhone || '',
-    flat: currentLocation?.flat || '',
-    street: currentLocation?.street || currentLocation?.area || currentLocation?.name || '',
-    city: currentLocation?.city || (currentLocation?.name?.includes(',') ? currentLocation.name.split(',')[1].trim() : 'Chikkamagaluru'),
-    pincode: currentLocation?.pincode || '577101'
+  const [address, setAddress] = useState(() => {
+    const custName = customerName && customerName !== 'Customer' ? customerName : '';
+    const phone = customerPhone || '';
+    const flat = currentLocation?.flat || '';
+    const street = currentLocation?.street || currentLocation?.area || '';
+    const city = currentLocation?.city || (currentLocation?.name?.includes(',') ? currentLocation.name.split(',')[0].trim() : (currentLocation?.name || ''));
+    const pincode = currentLocation?.pincode || '';
+
+    return {
+      fullName: custName,
+      phone: phone,
+      flat: flat,
+      street: street,
+      city: city,
+      pincode: pincode
+    };
   });
 
   useEffect(() => {
@@ -25,8 +34,8 @@ export default function CheckoutPage() {
       setAddress(prev => ({
         ...prev,
         flat: currentLocation.flat || prev.flat,
-        street: currentLocation.street || currentLocation.area || currentLocation.name || prev.street,
-        city: currentLocation.city || prev.city,
+        street: currentLocation.street || currentLocation.area || prev.street,
+        city: currentLocation.city || (currentLocation.name?.includes(',') ? currentLocation.name.split(',')[0].trim() : prev.city),
         pincode: currentLocation.pincode || prev.pincode
       }));
     }
@@ -53,7 +62,14 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (isPlacingOrder) return;
 
-    const formattedAddr = `${address.flat ? address.flat + ', ' : ''}${address.street}, ${address.city} - ${address.pincode}`.trim();
+    const parts = [
+      address.flat,
+      address.street,
+      address.city,
+      address.pincode ? `PIN: ${address.pincode}` : ''
+    ].map(s => (s || '').trim()).filter(Boolean);
+
+    const formattedAddr = parts.join(', ') || 'Doorstep Delivery';
     const paymentLabel = paymentMethod === 'upi' ? `UPI (${upiApp.toUpperCase()})` : paymentMethod === 'card' ? 'Credit/Debit Card' : 'Cash on Delivery';
 
     await placeOrder({
@@ -126,12 +142,12 @@ export default function CheckoutPage() {
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-stone-700 font-bold mb-1">Street / Area / Landmark *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Near Bus Stand, Chikkamagaluru"
+                  placeholder="e.g. Near Bus Stand, Main Road"
                   value={address.street}
                   onChange={(e) => setAddress({ ...address, street: e.target.value })}
                   className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
@@ -139,13 +155,25 @@ export default function CheckoutPage() {
               </div>
 
               <div>
-                <label className="block text-stone-700 font-bold mb-1">City & Pincode *</label>
+                <label className="block text-stone-700 font-bold mb-1">City / Town *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Chikkamagaluru - 577101"
-                  value={`${address.city} - ${address.pincode}`}
+                  placeholder="Enter city"
+                  value={address.city}
                   onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                  className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-700 font-bold mb-1">Pincode *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 577101"
+                  value={address.pincode}
+                  onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
                   className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600"
                 />
               </div>
@@ -169,8 +197,8 @@ export default function CheckoutPage() {
                     : 'border-stone-200 hover:border-stone-300 text-stone-700'
                 }`}
               >
-                <span className="block font-black text-emerald-800">🚀 Express 25 Mins</span>
-                <span className="text-[10px] text-stone-500 font-medium">Fastest doorstep delivery</span>
+                <span className="block font-black text-emerald-800">🚀 Evening Delivery</span>
+                <span className="text-[10px] text-stone-500 font-medium">Delivery will be done after 4:00 PM</span>
               </button>
 
               <button
@@ -183,7 +211,7 @@ export default function CheckoutPage() {
                 }`}
               >
                 <span className="block font-black text-stone-900">🌆 Today Evening</span>
-                <span className="text-[10px] text-stone-500 font-medium">Slot: 6:00 PM - 8:00 PM</span>
+                <span className="text-[10px] text-stone-500 font-medium">Slot: After 4:00 PM</span>
               </button>
 
               <button
@@ -195,8 +223,8 @@ export default function CheckoutPage() {
                     : 'border-stone-200 hover:border-stone-300 text-stone-700'
                 }`}
               >
-                <span className="block font-black text-stone-900">☀️ Tomorrow Morning</span>
-                <span className="text-[10px] text-stone-500 font-medium">Slot: 8:00 AM - 10:00 AM</span>
+                <span className="block font-black text-stone-900">☀️ Tomorrow</span>
+                <span className="text-[10px] text-stone-500 font-medium">Delivery after 4:00 PM</span>
               </button>
             </div>
           </div>
@@ -221,7 +249,7 @@ export default function CheckoutPage() {
                   />
                   <div>
                     <span className="font-extrabold text-stone-900 text-sm block">UPI (Google Pay / PhonePe / Paytm)</span>
-                    <span className="text-stone-500 text-xs font-semibold">Instant discount available</span>
+                    <span className="text-stone-500 text-xs font-semibold">Direct discount available</span>
                   </div>
                 </div>
                 <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">RECOMMENDED</span>

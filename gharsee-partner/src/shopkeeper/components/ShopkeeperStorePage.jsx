@@ -680,7 +680,7 @@ export default function ShopkeeperStorePage() {
                       {form.category} • {form.locality || 'Locality'}, {form.city || 'City'}
                     </p>
                     <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] font-bold text-emerald-800">
-                      <span>⚡ 10-20 min delivery</span>
+                      <span>⚡ Delivery after 4:00 PM</span>
                       <span className="text-stone-400">~1.2 km away</span>
                     </div>
                   </div>

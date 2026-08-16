@@ -7,7 +7,7 @@ export default function Testimonials() {
       name: 'Ananya Deshmukh',
       location: 'Indiranagar, Bengaluru',
       rating: 5,
-      comment: 'The Handwritten List Upload feature is a complete lifesaver! I snapped a picture of my mom’s grocery note and it converted all 8 items into my cart in seconds. Delivered in 18 minutes!'
+      comment: 'The Handwritten List Upload feature is a complete lifesaver! I snapped a picture of my mom’s grocery note and it converted all 8 items into my cart in seconds. Delivery done after 4:00 PM!'
     },
     {
       name: 'Vikram Mehta',
@@ -19,7 +19,7 @@ export default function Testimonials() {
       name: 'Pooja Iyer',
       location: 'Whitefield, Bengaluru',
       rating: 5,
-      comment: 'Super fast delivery and incredible customer service! Love the clean layout and transparent prices on staples like Basmati rice and Aashirvaad Atta.'
+      comment: 'Reliable delivery done after 4:00 PM and incredible customer service! Love the clean layout and transparent prices on staples like Basmati rice and Aashirvaad Atta.'
     }
   ];
 
@@ -32,7 +32,7 @@ export default function Testimonials() {
           <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-stone-900">
             Loved by 10,000+ Families
           </h2>
-          <p className="text-stone-500 text-sm">See what real households say about their express grocery delivery experience.</p>
+          <p className="text-stone-500 text-sm">See what real households say about their grocery delivery experience.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

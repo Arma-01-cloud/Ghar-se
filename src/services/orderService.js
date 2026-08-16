@@ -75,7 +75,16 @@ export async function createOrderInSupabase(orderData) {
 
     let customerPhone = orderData.customerPhone || orderData.phone || savedPhone;
     let customerName = orderData.customerName || orderData.name || savedName || 'Customer';
-    const deliveryAddress = orderData.address || orderData.delivery_address || 'Chikkamagaluru, Karnataka';
+    
+    let deliveryAddress = orderData.address || orderData.delivery_address || orderData.locationName || '';
+    if (!deliveryAddress || deliveryAddress === 'Customer Address') {
+      try {
+        const savedLoc = JSON.parse(localStorage.getItem('gharsee_current_location') || '{}');
+        deliveryAddress = savedLoc.formattedAddress || savedLoc.name || `${savedLoc.flat ? savedLoc.flat + ', ' : ''}${savedLoc.street ? savedLoc.street + ', ' : ''}${savedLoc.city || ''}`.trim() || 'Doorstep Delivery';
+      } catch {
+        deliveryAddress = 'Doorstep Delivery';
+      }
+    }
 
     // 1. Authoritative Customer Database Lookup from Supabase profiles / customer_addresses
     const cleanCustDigits = get10DigitPhone(customerPhone);
@@ -95,13 +104,18 @@ export async function createOrderInSupabase(orderData) {
       if (matchedProf?.phone) customerPhone = matchedProf.phone;
       else if (matchedAddr?.phone) customerPhone = matchedAddr.phone;
       else customerPhone = `+91 ${cleanCustDigits}`;
+
+      if ((!deliveryAddress || deliveryAddress === 'Doorstep Delivery') && matchedAddr?.address_text) {
+        deliveryAddress = matchedAddr.address_text;
+      }
     }
 
-    // 2. Authoritative Shopkeeper / Store Database Lookup from Supabase shops table
+    // 2. Authoritative Shopkeeper / Store Database Lookup
+    const isAnyStore = orderData.fulfillment_mode === 'shop_any_store' || !orderData.store_id;
     let shopkeeperPhone = '+91 81238 21300';
-    let storeName = orderData.storeName || orderData.store_name || 'Local Grocery Store';
+    let storeName = isAnyStore ? 'Shop From Any Store (Rider Choice)' : (orderData.storeName || orderData.store_name || 'Local Grocery Store');
 
-    if (orderData.store_id) {
+    if (!isAnyStore && orderData.store_id) {
       const { data: storeRow } = await supabase
         .from('shops')
         .select('*')
@@ -112,16 +126,6 @@ export async function createOrderInSupabase(orderData) {
         storeName = storeRow.name || storeName;
         shopkeeperPhone = storeRow.phone || storeRow.shopkeeper_phone || shopkeeperPhone;
       }
-    } else {
-      // Fallback lookup by shop name or first shop in Supabase
-      const { data: allShops } = await supabase.from('shops').select('*');
-      if (allShops && allShops.length > 0) {
-        const matched = allShops.find(s => s.name?.toLowerCase() === storeName.toLowerCase()) || allShops[0];
-        if (matched) {
-          storeName = matched.name;
-          shopkeeperPhone = matched.phone || matched.shopkeeper_phone || shopkeeperPhone;
-        }
-      }
     }
 
     // 3. Insert row into orders table with REAL customer_phone & customer_name & store_id
@@ -129,12 +133,12 @@ export async function createOrderInSupabase(orderData) {
       .from('orders')
       .insert([{
         id: orderData.id,
-        store_id: orderData.store_id || null,
+        store_id: isAnyStore ? null : (orderData.store_id || null),
         store_name: storeName,
         customer_name: customerName,
         customer_phone: customerPhone,
         delivery_address: deliveryAddress,
-        fulfillment_mode: orderData.fulfillment_mode || 'store_selected',
+        fulfillment_mode: isAnyStore ? 'shop_any_store' : (orderData.fulfillment_mode || 'store_selected'),
         status: orderData.status || 'pending',
         total_amount: orderData.totalAmount || orderData.total_amount || 0,
         subtotal: orderData.subtotal || 0,
@@ -342,13 +346,18 @@ export async function fetchRiderDeliveries(riderId = null) {
         customerPhone: o.customer_phone || o.phone || '',
         deliveryAddress: o.delivery_address || 'Chikkamagaluru, Karnataka',
         distance: '1.8 km',
-        estimatedTime: '15-20 min',
-        itemCount: o.order_items?.length || (Array.isArray(o.items) ? o.items.length : 1),
-        items: o.order_items?.map(i => `${i.product_name} (${i.quantity} ${i.unit})${!i.product_id ? ' (Manual Item)' : ''}`) || ['Grocery Items'],
+        estimatedTime: 'Delivery after 4:00 PM',
+        parsedItems: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
+          name: i.product_name || i.name,
+          quantity: i.quantity || 1,
+          unit: i.unit || '1 unit',
+          price: i.price || 0,
+          isManual: !i.product_id
+        })) : (Array.isArray(o.items) ? o.items.map(i => typeof i === 'string' ? { name: i, quantity: 1, unit: '1 unit', price: 0 } : i) : []),
         estimatedEarnings: 65,
         paymentStatus: o.payment_method || 'Cash on Delivery',
         status: o.status || 'pending',
-        fulfillment_mode: o.fulfillment_mode || 'store_selected'
+        fulfillment_mode: o.fulfillment_mode || (o.store_id ? 'store_selected' : 'shop_any_store')
       };
     });
 
@@ -368,6 +377,45 @@ export async function fetchRiderDeliveries(riderId = null) {
     return { incoming, active, history };
   } catch {
     return { incoming: null, active: null, history: [] };
+  }
+}
+
+// Atomically Claim Order in Supabase (First-Accept-Wins)
+export async function claimRiderOrderInSupabase(orderId, riderId, riderName = '') {
+  if (!isSupabaseConfigured) return { success: true };
+
+  try {
+    // 1. Verify if already claimed by another rider
+    const { data: existingOrder, error: checkError } = await supabase
+      .from('orders')
+      .select('id, rider_id, status')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (existingOrder && existingOrder.rider_id && String(existingOrder.rider_id) !== String(riderId)) {
+      return {
+        success: false,
+        reason: 'ALREADY_CLAIMED',
+        message: 'This delivery was already accepted by another partner.'
+      };
+    }
+
+    // 2. Claim the order atomically
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        status: 'accepted',
+        rider_id: riderId
+      })
+      .eq('id', orderId);
+
+    if (updateError) {
+      return { success: false, reason: 'UPDATE_FAILED', message: updateError.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, reason: 'EXCEPTION', message: err.message };
   }
 }
 
