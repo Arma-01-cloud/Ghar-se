@@ -127,6 +127,8 @@ export default function AnyStoreCheckoutModal({
       fullName: formData.fullName.trim(),
       phone: normalizedPhone,
       address: formattedAddress,
+      deliveryAddress: formattedAddress,
+      delivery_address: formattedAddress,
       flat: formData.flat.trim(),
       street: formData.street.trim(),
       city: formData.city.trim(),

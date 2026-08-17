@@ -10,11 +10,11 @@ export default function AdminCustomersTab() {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      c.fullName.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      c.city.toLowerCase().includes(q) ||
-      c.addressText.toLowerCase().includes(q) ||
-      (c.pincode && c.pincode.includes(q))
+      (c.fullName || '').toLowerCase().includes(q) ||
+      (c.phone || '').includes(q) ||
+      (c.city || '').toLowerCase().includes(q) ||
+      (c.addressText || '').toLowerCase().includes(q) ||
+      (c.pincode && String(c.pincode).includes(q))
     );
   });
 

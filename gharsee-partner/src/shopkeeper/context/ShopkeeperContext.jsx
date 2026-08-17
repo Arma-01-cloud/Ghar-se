@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { fetchShopkeeperOrders, updateOrderStatusInSupabase } from '../../services/orderService';
+import { fetchProductsByStore, updateProductStockInSupabase } from '../../services/productService';
 import { validateStatusTransition } from '../services/shopkeeperService';
 import { get10DigitPhone } from '../../services/authService';
 
@@ -222,9 +223,20 @@ export const ShopkeeperProvider = ({ children }) => {
     }
   };
 
+  const loadLiveProducts = async () => {
+    if (!storeProfile?.id) return;
+    try {
+      const fetched = await fetchProductsByStore(storeProfile.id);
+      if (fetched && fetched.length > 0) {
+        setProducts(fetched);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     if (storeProfile?.id) {
       loadLiveOrders();
+      loadLiveProducts();
     }
 
     if (isSupabaseConfigured) {
@@ -334,6 +346,14 @@ export const ShopkeeperProvider = ({ children }) => {
     await loadUserStoreFromSupabase(userObj.id, userObj.phone);
   };
 
+  const updateStock = async (productId, newStock) => {
+    const parsed = parseInt(newStock, 10);
+    if (isNaN(parsed)) return;
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: parsed } : p));
+    await updateProductStockInSupabase(productId, parsed);
+    addShopkeeperToast(`Stock updated to ${parsed} units!`, 'success');
+  };
+
   const logoutShopkeeper = async () => {
     if (isSupabaseConfigured) {
       try { await supabase.auth.signOut(); } catch {}
@@ -384,6 +404,9 @@ export const ShopkeeperProvider = ({ children }) => {
         acceptOrder,
         rejectOrder,
         updateOrderStatus,
+        updateStock,
+        loadLiveProducts,
+        setProducts,
         addShopkeeperToast,
         removeShopkeeperToast,
         loginShopkeeper,

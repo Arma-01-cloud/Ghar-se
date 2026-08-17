@@ -56,18 +56,18 @@ export default function ShopkeeperNavbar({ onToggleMobileSidebar }) {
           type="button"
           onClick={toggleStoreStatus}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl font-extrabold text-xs transition-all shadow-xs ${
-            storeProfile.isOpen
+            storeProfile?.isOpen
               ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
               : 'bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100'
           }`}
           title="Click to toggle store opening status"
         >
-          <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${storeProfile.isOpen ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+          <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${storeProfile?.isOpen ? 'bg-emerald-500' : 'bg-rose-500'}`} />
           <span className="hidden sm:inline">
-            {storeProfile.isOpen ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}
+            {storeProfile?.isOpen ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}
           </span>
           <span className="sm:hidden">
-            {storeProfile.isOpen ? 'OPEN' : 'CLOSED'}
+            {storeProfile?.isOpen ? 'OPEN' : 'CLOSED'}
           </span>
         </button>
 

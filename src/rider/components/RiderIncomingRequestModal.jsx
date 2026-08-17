@@ -5,19 +5,18 @@ import {
 import confetti from 'canvas-confetti';
 
 export default function RiderIncomingRequestModal({ notification, onAccept, onDecline }) {
-  if (!notification) return null;
-
-  const payload = notification.payload || {};
   const [secondsLeft, setSecondsLeft] = useState(30);
+  const payload = notification?.payload || {};
 
   // 30-second countdown ring timer
   useEffect(() => {
+    if (!notification) return;
     setSecondsLeft(30);
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          onDecline(notification.id, 'Timed out (Auto-declined)');
+          if (onDecline) onDecline(notification.id, 'Timed out (Auto-declined)');
           return 0;
         }
         return prev - 1;
@@ -25,7 +24,9 @@ export default function RiderIncomingRequestModal({ notification, onAccept, onDe
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [notification?.id]);
+  }, [notification?.id, onDecline]);
+
+  if (!notification) return null;
 
   const handleAcceptClick = () => {
     try {

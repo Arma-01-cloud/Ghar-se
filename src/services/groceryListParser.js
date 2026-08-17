@@ -20,9 +20,9 @@ export function matchItemToCatalog(itemName) {
   const searchLower = itemName.toLowerCase().trim();
   
   const matches = PRODUCTS.filter(product => {
-    const pName = product.name.toLowerCase();
-    const pCat = product.category.toLowerCase();
-    const pBrand = product.brand.toLowerCase();
+    const pName = (product.name || '').toLowerCase();
+    const pCat = (product.category || '').toLowerCase();
+    const pBrand = (product.brand || '').toLowerCase();
 
     // Direct substring or keyword match
     const keywords = searchLower.split(/\s+/).filter(k => k.length > 2);

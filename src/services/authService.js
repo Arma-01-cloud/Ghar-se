@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { hashPasswordForStorage, verifyPasswordAgainstStorage } from '../utils/crypto';
 
 // Enable real authentication with Supabase
 export const ENABLE_REAL_AUTH = true;
@@ -62,6 +63,7 @@ export async function signUpUserWithPhone({
 
   try {
     const normalizedPhone = normalizePhone(phone);
+    const hashed = await hashPasswordForStorage(password);
 
     // 1. Check if store with this 10-digit phone already exists in Supabase shops table
     const { data: allShops } = await supabase.from('shops').select('*');
@@ -78,7 +80,7 @@ export async function signUpUserWithPhone({
       .upsert({
         id: userId,
         phone: normalizedPhone,
-        password: password,
+        password: hashed,
         full_name: fullName || 'Store Partner',
         role: role
       });
@@ -95,7 +97,7 @@ export async function signUpUserWithPhone({
         .insert([{
           name: storeName,
           phone: normalizedPhone,
-          password: password,
+          password: hashed,
           address: shopAddress,
           locality: shopLocality,
           city: shopCity,
@@ -173,7 +175,12 @@ export async function signInUserWithPhone({ phone, password }) {
     // CRITICAL CHECK 2: VERIFY PASSWORD DIRECTLY FROM SHOPS TABLE RECORD
     const dbPassword = matchedShop?.password || matchedProfile?.password;
 
-    if (dbPassword && dbPassword !== password) {
+    let passwordOk = false;
+    if (dbPassword) {
+      passwordOk = await verifyPasswordAgainstStorage(password, dbPassword);
+    }
+
+    if (dbPassword && !passwordOk) {
       return {
         session: null,
         user: null,
@@ -182,13 +189,18 @@ export async function signInUserWithPhone({ phone, password }) {
       };
     }
 
-    // If shop had NULL password (legacy record), update password in Supabase shops table
-    if (matchedShop && !matchedShop.password) {
+    // If the matched row had NULL password, set one now (legacy row upgrade).
+    // If the matched row had a plain-text password, upgrade it to a hash on
+    // successful login (best-effort — failure is non-fatal).
+    if (matchedShop && (!matchedShop.password || (dbPassword && !dbPassword.startsWith('sha256$')))) {
       try {
-        await supabase
-          .from('shops')
-          .update({ password: password })
-          .eq('id', matchedShop.id);
+        const hashed = await hashPasswordForStorage(password);
+        if (hashed) {
+          await supabase
+            .from('shops')
+            .update({ password: hashed })
+            .eq('id', matchedShop.id);
+        }
       } catch {}
     }
 

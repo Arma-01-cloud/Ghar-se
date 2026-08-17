@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { isValidOrderStatus } from '../../utils/validators';
 
 // Fetch all stores with approval, operational status, and live product count
 export async function fetchAllAdminShops() {
@@ -69,6 +70,7 @@ export async function approveShopInSupabase(shopId) {
       .update({
         status: 'open',
         is_open: true,
+        is_approved: true,
         updated_at: new Date().toISOString()
       })
       .eq('id', shopId);
@@ -79,7 +81,8 @@ export async function approveShopInSupabase(shopId) {
         .from('shops')
         .update({
           status: 'open',
-          is_open: true
+          is_open: true,
+          is_approved: true
         })
         .eq('id', shopId);
 
@@ -103,6 +106,7 @@ export async function rejectShopInSupabase(shopId) {
       .update({
         status: 'rejected',
         is_open: false,
+        is_approved: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', shopId);
@@ -112,7 +116,8 @@ export async function rejectShopInSupabase(shopId) {
         .from('shops')
         .update({
           status: 'rejected',
-          is_open: false
+          is_open: false,
+          is_approved: false
         })
         .eq('id', shopId);
 
@@ -213,7 +218,9 @@ export async function approveRiderInSupabase(riderId) {
     const { error } = await supabase
       .from('rider_profiles')
       .update({
+        is_approved: true,
         is_online: true,
+        status: 'approved',
         updated_at: new Date().toISOString()
       })
       .eq('id', riderId);
@@ -222,7 +229,9 @@ export async function approveRiderInSupabase(riderId) {
       const { error: err2 } = await supabase
         .from('rider_profiles')
         .update({
-          is_online: true
+          is_approved: true,
+          is_online: true,
+          status: 'approved'
         })
         .eq('id', riderId);
 
@@ -244,7 +253,9 @@ export async function rejectRiderInSupabase(riderId) {
     const { error } = await supabase
       .from('rider_profiles')
       .update({
+        is_approved: false,
         is_online: false,
+        status: 'rejected',
         updated_at: new Date().toISOString()
       })
       .eq('id', riderId);
@@ -253,7 +264,9 @@ export async function rejectRiderInSupabase(riderId) {
       const { error: err2 } = await supabase
         .from('rider_profiles')
         .update({
-          is_online: false
+          is_approved: false,
+          is_online: false,
+          status: 'rejected'
         })
         .eq('id', riderId);
 
@@ -340,6 +353,11 @@ export async function fetchAllAdminOrders() {
 // Update Order Status from Admin Portal
 export async function updateAdminOrderStatus(orderId, nextStatus) {
   if (!isSupabaseConfigured) return false;
+
+  if (!isValidOrderStatus(nextStatus)) {
+    console.warn('updateAdminOrderStatus: invalid status', nextStatus);
+    return false;
+  }
 
   try {
     const { error } = await supabase
@@ -514,9 +532,20 @@ export async function updateProductInSupabase(productId, productData) {
 // IMAGE UPLOAD & PROCESSING UTILITY
 // -------------------------------------------------------------
 
+// Reject obviously oversized or non-image uploads before we waste CPU on them.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
 // Compress and convert image File to optimized web Data URL
 export async function uploadImageFile(file) {
   if (!file) return null;
+
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error('Unsupported image type. Please upload a JPEG, PNG, WEBP, or GIF file.');
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error('Image is too large. Maximum allowed size is 5 MB.');
+  }
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -13,11 +13,11 @@ export default function AdminOrdersTab() {
   const filteredOrders = orders.filter((o) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
-      String(o.id).toLowerCase().includes(q) ||
-      o.customerName.toLowerCase().includes(q) ||
-      o.customerPhone.includes(q) ||
-      o.storeName.toLowerCase().includes(q) ||
-      o.deliveryAddress.toLowerCase().includes(q)
+      String(o.id || '').toLowerCase().includes(q) ||
+      (o.customerName || '').toLowerCase().includes(q) ||
+      (o.customerPhone || '').includes(q) ||
+      (o.storeName || '').toLowerCase().includes(q) ||
+      (o.deliveryAddress || '').toLowerCase().includes(q)
     );
 
     if (!matchesSearch) return false;

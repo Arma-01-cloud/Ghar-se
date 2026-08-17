@@ -3,13 +3,17 @@ import { useCart } from '../context/CartContext';
 import { parseGroceryListImage, parseRawListText, matchItemToCatalog } from '../services/groceryListParser';
 import SmartProductMatcher from './SmartProductMatcher';
 import ManualEntryForm from './ManualEntryForm';
-import { 
-  Upload, Camera, Image as ImageIcon, Sparkles, CheckCircle2, 
-  Trash2, Plus, RefreshCw, ShoppingBag, AlertCircle, ArrowRight, Check 
+import {
+  Upload, Camera, Image as ImageIcon, Sparkles, CheckCircle2,
+  Trash2, Plus, RefreshCw, ShoppingBag, AlertCircle, ArrowRight, Check
 } from 'lucide-react';
 
+// Client-side image upload guard for handwritten grocery lists.
+const MAX_LIST_IMAGE_BYTES = 6 * 1024 * 1024; // 6 MB
+const ALLOWED_LIST_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 export default function UploadListPage() {
-  const { addMultipleToCart, setActiveTab } = useCart();
+  const { addMultipleToCart, setActiveTab, addToast } = useCart();
   const [imageSrc, setImageSrc] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -21,8 +25,17 @@ export default function UploadListPage() {
 
   // File upload handler
   const handleFileSelect = (file) => {
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
+    if (!ALLOWED_LIST_IMAGE_TYPES.has(file.type)) {
+      addToast('Unsupported image type. Please upload a JPEG, PNG, or WEBP file.', 'error');
+      return;
+    }
+    if (file.size > MAX_LIST_IMAGE_BYTES) {
+      addToast('Image is too large. Maximum allowed size is 6 MB.', 'error');
+      return;
+    }
     const reader = new FileReader();
+    reader.onerror = () => addToast('Failed to read image file.', 'error');
     reader.onload = (e) => {
       setImageSrc(e.target.result);
       setHasParsed(false);

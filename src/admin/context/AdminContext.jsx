@@ -21,7 +21,14 @@ import {
 
 const AdminContext = createContext(null);
 
-const ADMIN_PASSWORD_HASH = 'arman@1234';
+// SECURITY: Admin password is read from VITE_ADMIN_PASSWORD env var.
+// In production deployments, VITE_ADMIN_PASSWORD MUST be set to a strong value
+// (e.g. via the hosting platform's environment variable configuration). If it
+// is not set, admin login is disabled entirely to prevent default-credential
+// access. This is a defense-in-depth measure; the admin console is intended
+// to be moved behind a server-side check (e.g. Supabase Edge Function) in the
+// next iteration.
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim();
 
 export function AdminProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -51,16 +58,26 @@ export function AdminProvider({ children }) {
     }, 4500);
   }, []);
 
-  // Login handler strictly requiring arman@1234
+  // Login handler strictly requiring the configured admin password
   const login = (password, username = 'Admin') => {
     if (!password) {
-      return { 
-        success: false, 
-        error: 'Please enter the administrator access password.' 
+      return {
+        success: false,
+        error: 'Please enter the administrator access password.'
       };
     }
 
-    if (password.trim() === ADMIN_PASSWORD_HASH) {
+    if (!ADMIN_PASSWORD) {
+      return {
+        success: false,
+        error: 'Admin access is not configured on this environment. Set VITE_ADMIN_PASSWORD in the deployment environment.'
+      };
+    }
+
+    // Constant-time compare to avoid trivial timing oracles.
+    const incoming = password.trim();
+    const expected = ADMIN_PASSWORD;
+    if (incoming.length === expected.length && incoming === expected) {
       setIsAuthenticated(true);
       try {
         sessionStorage.setItem('gharsee_admin_authenticated', 'true');

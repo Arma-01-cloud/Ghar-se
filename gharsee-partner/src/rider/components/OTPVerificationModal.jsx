@@ -81,7 +81,7 @@ export default function OTPVerificationModal({ delivery, onClose }) {
             </div>
 
             <p className="text-[11px] text-stone-400 text-center mt-1.5 font-medium">
-              Ask customer for the 4-digit code sent to their phone (Demo OTP: {delivery.otp})
+              Ask customer for the 4-digit code sent to their phone (Demo OTP: {delivery.otp || '4820'})
             </p>
           </div>
 

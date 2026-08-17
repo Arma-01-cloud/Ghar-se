@@ -33,18 +33,18 @@ export default function ShopkeeperDashboard() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-display font-black text-2xl sm:text-3xl text-stone-900">
-              Good evening, {storeProfile.ownerName}
+              Good evening, {storeProfile?.ownerName || 'Partner'}
             </h1>
           </div>
           <p className="text-stone-500 text-xs sm:text-sm mt-0.5">
-            Here's what's happening with <strong className="text-emerald-800 font-bold">{storeProfile.name}</strong> today.
+            Here's what's happening with <strong className="text-emerald-800 font-bold">{storeProfile?.name || 'Your Store'}</strong> today.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-3.5 py-1.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-extrabold flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${storeProfile.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span>{storeProfile.isOpen ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${storeProfile?.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span>{storeProfile?.isOpen ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}</span>
           </div>
 
           <button

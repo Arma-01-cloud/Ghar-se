@@ -14,11 +14,11 @@ export default function AdminShopsTab() {
     // Search match
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
-      s.name.toLowerCase().includes(q) ||
-      s.locality.toLowerCase().includes(q) ||
-      s.city.toLowerCase().includes(q) ||
-      s.phone.includes(q) ||
-      (s.address && s.address.toLowerCase().includes(q))
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.locality || '').toLowerCase().includes(q) ||
+      (s.city || '').toLowerCase().includes(q) ||
+      (s.phone || '').includes(q) ||
+      ((s.address || '').toLowerCase().includes(q))
     );
 
     // Status filter

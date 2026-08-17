@@ -28,9 +28,9 @@ export default function ShopkeeperOrdersPage() {
       // Search filter
       if (searchQuery && searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchId = o.id.toLowerCase().includes(q);
-        const matchCustomer = o.customerName.toLowerCase().includes(q);
-        const matchAddress = o.deliveryAddress.toLowerCase().includes(q);
+        const matchId = String(o.id || '').toLowerCase().includes(q);
+        const matchCustomer = (o.customerName || '').toLowerCase().includes(q);
+        const matchAddress = (o.deliveryAddress || o.address || '').toLowerCase().includes(q);
         const matchPhone = (o.customerPhone || o.phone || '').includes(q);
         if (!matchId && !matchCustomer && !matchAddress && !matchPhone) return false;
       }

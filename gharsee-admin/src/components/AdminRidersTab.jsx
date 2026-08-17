@@ -13,11 +13,11 @@ export default function AdminRidersTab() {
   const filteredRiders = riders.filter((r) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
-      r.fullName.toLowerCase().includes(q) ||
-      r.phone.includes(q) ||
-      r.vehicleNumber.toLowerCase().includes(q) ||
-      r.drivingLicense.toLowerCase().includes(q) ||
-      r.deliveryCity.toLowerCase().includes(q)
+      (r.fullName || '').toLowerCase().includes(q) ||
+      (r.phone || '').includes(q) ||
+      (r.vehicleNumber || '').toLowerCase().includes(q) ||
+      (r.drivingLicense || '').toLowerCase().includes(q) ||
+      (r.deliveryCity || '').toLowerCase().includes(q)
     );
 
     if (!matchesSearch) return false;

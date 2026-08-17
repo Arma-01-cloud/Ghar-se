@@ -91,6 +91,17 @@ export async function addProductToSupabase(productData) {
 }
 
 export async function updateProductStockInSupabase(productId, newStock) {
-  if (!isSupabaseConfigured) return true;
+  if (!isSupabaseConfigured || !productId) return true;
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ stock: parseInt(newStock, 10) || 0 })
+      .eq('id', productId);
+    if (error) {
+      console.warn('Could not update stock in Supabase:', error.message);
+    }
+  } catch (err) {
+    console.error('Exception updating product stock:', err);
+  }
   return true;
 }

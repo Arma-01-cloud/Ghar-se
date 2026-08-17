@@ -281,15 +281,25 @@ export const CartProvider = ({ children }) => {
     addToast(`Selected store: ${store.name}`, 'info');
   };
 
-  const confirmSwitchStore = (targetStore, itemToAdd = null) => {
+  const confirmSwitchStore = (targetStore = null, itemToAdd = null) => {
+    const target = (targetStore && targetStore.id) ? targetStore : storeConflictModal?.targetStore;
+    const pendingItem = itemToAdd || storeConflictModal?.pendingItem;
+    const pendingItems = storeConflictModal?.pendingItems;
+    if (!target) {
+      setStoreConflictModal(null);
+      return;
+    }
     setCart([]);
-    setCurrentStoreState(targetStore);
+    setCurrentStoreState(target);
     setStoreConflictModal(null);
-    if (itemToAdd) {
-      setCart([{ product: itemToAdd.product, quantity: itemToAdd.quantity || 1, storeId: targetStore.id }]);
-      addToast(`Switched to ${targetStore.name} & added ${itemToAdd.product.name}`, 'success');
+    if (pendingItem && pendingItem.product) {
+      setCart([{ product: pendingItem.product, quantity: pendingItem.quantity || 1, storeId: target.id }]);
+      addToast(`Switched to ${target.name} & added ${pendingItem.product.name}`, 'success');
+    } else if (pendingItems && pendingItems.length > 0) {
+      setCart(pendingItems.map(i => ({ product: i.product, quantity: i.quantity || 1, storeId: target.id })));
+      addToast(`Switched to ${target.name} & added ${pendingItems.length} items`, 'success');
     } else {
-      addToast(`Switched active store to ${targetStore.name}`, 'info');
+      addToast(`Switched active store to ${target.name}`, 'info');
     }
   };
 
@@ -394,39 +404,65 @@ export const CartProvider = ({ children }) => {
       const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
       const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
 
+      // Use crypto.randomUUID() so colliding order IDs are vanishingly unlikely.
+      // We keep the human-friendly prefix for the shopkeeper's WhatsApp message.
+      const uniqueSuffix = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID().split('-')[0].toUpperCase()
+        : Math.floor(10000 + Math.random() * 90000).toString();
+
+      const deliveryAddress = orderDetails.address || orderDetails.deliveryAddress || orderDetails.delivery_address || '';
+
+      // Persist customer address to Supabase
+      if (phoneNum && deliveryAddress) {
+        saveCustomerPhoneAddress({
+          phone: phoneNum,
+          name: cName,
+          addressText: deliveryAddress,
+          city: currentLocation?.city || 'Bengaluru',
+          flat: currentLocation?.flat || '',
+          street: currentLocation?.street || '',
+          pincode: currentLocation?.pincode || ''
+        }).catch(() => {});
+      }
+
       const newOrder = {
-        id: `GK-${Math.floor(10000 + Math.random() * 90000)}`,
+        id: `GK-${uniqueSuffix}`,
         fulfillment_mode: 'store_selected',
         store_id: currentStore ? currentStore.id : null,
         storeName: currentStore ? currentStore.name : 'Local Grocery Store',
         customerName: cName,
         customerPhone: phoneNum,
+        deliveryAddress: deliveryAddress,
+        delivery_address: deliveryAddress,
+        address: deliveryAddress,
         date: new Date().toISOString(),
-        items: cart.map(item => {
-          const isUUID = item.product?.id && typeof item.product.id === 'string' && item.product.id.length > 20;
-          return {
-            id: item.product.id,
-            name: item.product.name,
-            price: item.product.price,
-            quantity: item.quantity,
-            qty: item.quantity,
-            unit: item.product.unit || '1 unit',
-            replacementPreference: item.product.replacementPreference || 'replace_brand',
-            image: item.product.image,
-            isManual: !isUUID
-          };
-        }),
+        items: cart.map(item => ({
+          id: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          quantity: item.quantity,
+          qty: item.quantity,
+          unit: item.product.unit || '1 unit',
+          replacementPreference: item.product.replacementPreference || 'replace_brand',
+          image: item.product.image,
+          isManual: !item.product.id
+        })),
         subtotal: orderDetails.subtotal,
         deliveryFee: orderDetails.deliveryFee,
         discount: orderDetails.discount,
         totalAmount: orderDetails.totalAmount,
         status: 'pending',
-        paymentMethod: orderDetails.paymentMethod,
-        address: orderDetails.address
+        paymentMethod: orderDetails.paymentMethod
       };
 
       // 1. Create order in Supabase & lookup authoratative Customer / Shopkeeper database details
       const res = await createOrderInSupabase(newOrder);
+
+      if (res?.error) {
+        addToast(res.error, 'error');
+        setIsPlacingOrder(false);
+        return null;
+      }
 
       const savedOrder = res?.order || newOrder;
       const updatedOrders = [savedOrder, ...orders];
@@ -479,38 +515,62 @@ export const CartProvider = ({ children }) => {
       const phoneNum = orderDetails.phone || customerPhone || localStorage.getItem('gharsee_customer_phone') || '';
       const cName = orderDetails.fullName || customerName || localStorage.getItem('gharsee_customer_name') || 'Customer';
 
+      const uniqueSuffix = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID().split('-')[0].toUpperCase()
+        : Math.floor(10000 + Math.random() * 90000).toString();
+
+      const deliveryAddress = orderDetails.address || orderDetails.deliveryAddress || orderDetails.delivery_address || '';
+
+      // Persist customer address to Supabase
+      if (phoneNum && deliveryAddress) {
+        saveCustomerPhoneAddress({
+          phone: phoneNum,
+          name: cName,
+          addressText: deliveryAddress,
+          city: currentLocation?.city || 'Bengaluru',
+          flat: currentLocation?.flat || '',
+          street: currentLocation?.street || '',
+          pincode: currentLocation?.pincode || ''
+        }).catch(() => {});
+      }
+
       const newOrder = {
-        id: `GS-${Math.floor(10000 + Math.random() * 90000)}`,
+        id: `GS-${uniqueSuffix}`,
         fulfillment_mode: 'shop_any_store',
         store_id: null,
         storeName: 'Shop From Any Store (Rider Choice)',
         customerName: cName,
         customerPhone: phoneNum,
+        deliveryAddress: deliveryAddress,
+        delivery_address: deliveryAddress,
+        address: deliveryAddress,
         date: new Date().toISOString(),
-        items: groceryListItems.map(item => {
-          const isUUID = item.id && typeof item.id === 'string' && item.id.length > 20;
-          return {
-            id: item.id,
-            name: item.name || item.itemName,
-            price: item.price || 50,
-            quantity: item.quantity || 1,
-            qty: item.quantity || 1,
-            unit: item.unit || item.quantityUnit || '1 unit',
-            replacementPreference: item.replacementPreference || 'replace_brand',
-            image: item.image || '/images/cat_veg_fruits.jpg',
-            isManual: !isUUID
-          };
-        }),
+        items: groceryListItems.map(item => ({
+          id: item.id,
+          name: item.name || item.itemName,
+          price: item.price || 50,
+          quantity: item.quantity || 1,
+          qty: item.quantity || 1,
+          unit: item.unit || item.quantityUnit || '1 unit',
+          replacementPreference: item.replacementPreference || 'replace_brand',
+          image: item.image || '/images/cat_veg_fruits.jpg',
+          isManual: !item.id
+        })),
         subtotal: orderDetails.subtotal,
         deliveryFee: orderDetails.deliveryFee,
         discount: 0,
         totalAmount: orderDetails.totalAmount,
         status: 'pending',
-        paymentMethod: orderDetails.paymentMethod || 'Cash on Delivery',
-        address: orderDetails.address
+        paymentMethod: orderDetails.paymentMethod || 'Cash on Delivery'
       };
 
       const res = await createOrderInSupabase(newOrder);
+
+      if (res?.error) {
+        addToast(res.error, 'error');
+        setIsPlacingOrder(false);
+        return null;
+      }
 
       const savedOrder = res?.order || newOrder;
       const updatedOrders = [savedOrder, ...orders];

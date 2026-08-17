@@ -65,12 +65,12 @@ export default function AdminAnyStoreCatalogTab() {
   const filteredProducts = globalProducts.filter(p => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
-      p.name.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q) ||
-      p.unit.toLowerCase().includes(q)
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.category || '').toLowerCase().includes(q) ||
+      (p.unit || '').toLowerCase().includes(q)
     );
     if (!matchesSearch) return false;
-    if (selectedCategory !== 'all' && !p.category.toLowerCase().includes(selectedCategory.toLowerCase())) return false;
+    if (selectedCategory !== 'all' && !(p.category || '').toLowerCase().includes(selectedCategory.toLowerCase())) return false;
     return true;
   });
 

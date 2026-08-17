@@ -10,9 +10,9 @@ export default function ShopkeeperSidebar({ isMobileOpen, onCloseMobile }) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: pendingOrders.length > 0 ? pendingOrders.length : null, badgeColor: 'bg-amber-500 text-white' },
+    { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: (pendingOrders?.length > 0) ? pendingOrders.length : null, badgeColor: 'bg-amber-500 text-white' },
     { id: 'products', label: 'Products', icon: Package },
-    { id: 'inventory', label: 'Inventory', icon: Warehouse, badge: lowStockProducts.length > 0 ? lowStockProducts.length : null, badgeColor: 'bg-rose-500 text-white' },
+    { id: 'inventory', label: 'Inventory', icon: Warehouse, badge: (lowStockProducts?.length > 0) ? lowStockProducts.length : null, badgeColor: 'bg-rose-500 text-white' },
     { id: 'sales', label: 'Sales & Analytics', icon: TrendingUp },
     { id: 'store', label: 'Store Management', icon: Store },
     { id: 'settings', label: 'Settings', icon: Settings },

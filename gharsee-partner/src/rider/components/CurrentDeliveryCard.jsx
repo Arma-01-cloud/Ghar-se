@@ -306,7 +306,7 @@ export default function CurrentDeliveryCard({ delivery }) {
       {/* OTP VERIFICATION MODAL */}
       {showOtpModal && (
         <OTPVerificationModal
-          customerPhone={delivery.customerPhone}
+          delivery={delivery}
           onClose={() => setShowOtpModal(false)}
         />
       )}

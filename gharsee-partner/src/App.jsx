@@ -23,8 +23,9 @@ function PartnerAppContent() {
     };
   }, []);
 
+  const hasOrderIdParam = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('orderId');
   const isRiderRoute = (currentPath || '').startsWith('/rider') || (currentHash || '').includes('rider');
-  const isShopkeeperRoute = (currentPath || '').startsWith('/shopkeeper') || (currentHash || '').includes('shopkeeper');
+  const isShopkeeperRoute = (currentPath || '').startsWith('/shopkeeper') || (currentHash || '').includes('shopkeeper') || hasOrderIdParam;
 
   // 1. RIDER PARTNER APP PORTAL
   if (isRiderRoute) {

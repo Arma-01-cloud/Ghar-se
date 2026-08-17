@@ -69,6 +69,7 @@ export async function approveShopInSupabase(shopId) {
       .update({
         status: 'open',
         is_open: true,
+        is_approved: true,
         updated_at: new Date().toISOString()
       })
       .eq('id', shopId);
@@ -79,7 +80,8 @@ export async function approveShopInSupabase(shopId) {
         .from('shops')
         .update({
           status: 'open',
-          is_open: true
+          is_open: true,
+          is_approved: true
         })
         .eq('id', shopId);
 
@@ -103,6 +105,7 @@ export async function rejectShopInSupabase(shopId) {
       .update({
         status: 'rejected',
         is_open: false,
+        is_approved: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', shopId);
@@ -112,7 +115,8 @@ export async function rejectShopInSupabase(shopId) {
         .from('shops')
         .update({
           status: 'rejected',
-          is_open: false
+          is_open: false,
+          is_approved: false
         })
         .eq('id', shopId);
 
@@ -213,7 +217,9 @@ export async function approveRiderInSupabase(riderId) {
     const { error } = await supabase
       .from('rider_profiles')
       .update({
+        is_approved: true,
         is_online: true,
+        status: 'approved',
         updated_at: new Date().toISOString()
       })
       .eq('id', riderId);
@@ -222,7 +228,9 @@ export async function approveRiderInSupabase(riderId) {
       const { error: err2 } = await supabase
         .from('rider_profiles')
         .update({
-          is_online: true
+          is_approved: true,
+          is_online: true,
+          status: 'approved'
         })
         .eq('id', riderId);
 
@@ -244,7 +252,9 @@ export async function rejectRiderInSupabase(riderId) {
     const { error } = await supabase
       .from('rider_profiles')
       .update({
+        is_approved: false,
         is_online: false,
+        status: 'rejected',
         updated_at: new Date().toISOString()
       })
       .eq('id', riderId);
@@ -253,7 +263,9 @@ export async function rejectRiderInSupabase(riderId) {
       const { error: err2 } = await supabase
         .from('rider_profiles')
         .update({
-          is_online: false
+          is_approved: false,
+          is_online: false,
+          status: 'rejected'
         })
         .eq('id', riderId);
 

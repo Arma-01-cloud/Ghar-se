@@ -52,9 +52,16 @@ function AppContent() {
   const pathVal = currentPath || window.location.pathname || '';
   const hashVal = currentHash || window.location.hash || '';
 
-  const isAdminRoute = pathVal.startsWith('/admin') || hashVal.includes('admin');
-  const isRiderRoute = pathVal.startsWith('/rider') || hashVal.includes('rider');
-  const isShopkeeperRoute = pathVal.startsWith('/shopkeeper') || hashVal.includes('shopkeeper');
+  // Strict route matching: only exact path prefixes, and only top-level hash
+  // fragments (e.g. "#/admin"). We intentionally do NOT match substrings
+  // inside the hash to avoid hijacking the customer UI when a fragment
+  // somewhere contains the word "admin" (e.g. a product description).
+  const hashPath = hashVal.startsWith('#') ? hashVal.slice(1) : hashVal;
+  const hashFirstSeg = '/' + (hashPath.split('/').filter(Boolean)[0] || '');
+
+  const isAdminRoute = pathVal.startsWith('/admin') || hashFirstSeg === '/admin';
+  const isRiderRoute = pathVal.startsWith('/rider') || hashFirstSeg === '/rider';
+  const isShopkeeperRoute = pathVal.startsWith('/shopkeeper') || pathVal.startsWith('/partner') || hashFirstSeg === '/shopkeeper' || hashFirstSeg === '/partner';
 
   // CENTRAL ADMIN COMMAND PORTAL ROUTE
   if (isAdminRoute) {

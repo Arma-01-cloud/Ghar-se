@@ -347,6 +347,8 @@ export default function AnyStoreOrderBuilder() {
         deliveryFee: deliveryFee,
         totalAmount: estimatedTotal,
         address: confirmedDetails.address,
+        deliveryAddress: confirmedDetails.address,
+        delivery_address: confirmedDetails.address,
         paymentMethod: confirmedDetails.paymentMethod,
         locationName: confirmedDetails.address
       });

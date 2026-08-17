@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { normalizePhone, get10DigitPhone, generateUUID } from './authService';
+import { hashPasswordForStorage, verifyPasswordAgainstStorage } from '../utils/crypto';
 
 // Update Rider is_online status in Supabase rider_profiles table
 export async function updateRiderOnlineStatusInSupabase(riderPhone, isOnlineStatus) {
@@ -49,6 +50,7 @@ export async function signUpRiderInSupabase({ phone, password, fullName, vehicle
 
   try {
     const normalizedPhone = normalizePhone(phone);
+    const hashed = await hashPasswordForStorage(password);
 
     // 1. Check if rider with this 10-digit phone already exists in Supabase rider_profiles table
     const { data: allRiders } = await supabase.from('rider_profiles').select('*');
@@ -62,7 +64,7 @@ export async function signUpRiderInSupabase({ phone, password, fullName, vehicle
     const payload = {
       full_name: fullName.trim(),
       phone: normalizedPhone,
-      password: password,
+      password: hashed,
       vehicle_type: vehicleType,
       vehicle_number: vehicleNumber.trim().toUpperCase(),
       driving_license: drivingLicense.trim().toUpperCase(),
@@ -83,7 +85,7 @@ export async function signUpRiderInSupabase({ phone, password, fullName, vehicle
       const minimalPayload = {
         full_name: fullName.trim(),
         phone: normalizedPhone,
-        password: password,
+        password: hashed,
         is_online: false
       };
 
@@ -166,18 +168,29 @@ export async function signInRiderWithPhone({ phone, password }) {
     }
 
     // CRITICAL CHECK 2: VERIFY PASSWORD DIRECTLY FROM rider_profiles RECORD
-    if (matchedRider.password && matchedRider.password !== password) {
-      return {
-        user: null,
-        error: 'Incorrect password for this rider account. Phone number and password do not match our database records.'
-      };
+    if (matchedRider.password) {
+      const ok = await verifyPasswordAgainstStorage(password, matchedRider.password);
+      if (!ok) {
+        return {
+          user: null,
+          error: 'Incorrect password for this rider account. Phone number and password do not match our database records.'
+        };
+      }
     }
 
-    // Set rider is_online = true in Supabase upon successful sign-in
+    // Set rider is_online = true in Supabase upon successful sign-in.
+    // If the stored password was a legacy plain-text value, upgrade it to a
+    // hash on the way through (best-effort).
     try {
+      const isLegacy = !matchedRider.password || !String(matchedRider.password).startsWith('sha256$');
+      const update = { is_online: true };
+      if (isLegacy) {
+        const hashed = await hashPasswordForStorage(password);
+        if (hashed) update.password = hashed;
+      }
       await supabase
         .from('rider_profiles')
-        .update({ is_online: true, password: password })
+        .update(update)
         .eq('id', matchedRider.id);
     } catch {}
 

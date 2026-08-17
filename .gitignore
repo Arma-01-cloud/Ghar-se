@@ -1,14 +1,10 @@
 
 # DEPENDENCIES
 
-
 node_modules/
 **/node_modules/
 
-
-
 # BUILD / GENERATED FILES
-
 
 dist/
 **/dist/
@@ -19,23 +15,20 @@ dist-ssr/
 build/
 **/build/
 
-
-
 # ENVIRONMENT / SECRETS
-
 
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
 
 # Keep example environment files
 !.env.example
 !**/.env.example
 
-
-
 # LOGS
-
 
 logs/
 *.log
@@ -45,10 +38,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-
-
 # EDITORS
-
 
 .vscode/*
 !.vscode/extensions.json
@@ -57,40 +47,26 @@ lerna-debug.log*
 *.swp
 *.swo
 
-
-
 # OS FILES
-
 
 .DS_Store
 Thumbs.db
 
-
-
 # TEMPORARY FILES
-
 
 *.tmp
 *.temp
 *.bak
 
-
-
 # TEST / COVERAGE OUTPUT
-
 
 coverage/
 .nyc_output/
 
-
-
 # TYPESCRIPT / VITE CACHE
-
 
 *.tsbuildinfo
 .vite/
-
-
 
 # SUPABASE LOCAL GENERATED FILES
 

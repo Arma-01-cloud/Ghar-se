@@ -40,7 +40,7 @@ export default function ShopkeeperSettingsPage() {
               <label className="block text-stone-700 font-bold mb-1">Partner Email</label>
               <input
                 type="email"
-                defaultValue={storeProfile.email}
+                defaultValue={storeProfile?.email || ''}
                 className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
               />
             </div>
@@ -49,7 +49,7 @@ export default function ShopkeeperSettingsPage() {
               <label className="block text-stone-700 font-bold mb-1">Registered Phone</label>
               <input
                 type="text"
-                defaultValue={storeProfile.phone}
+                defaultValue={storeProfile?.phone || ''}
                 className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold"
               />
             </div>

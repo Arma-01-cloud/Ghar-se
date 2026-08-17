@@ -80,7 +80,9 @@ export default function CheckoutPage() {
       discount: 0,
       totalAmount: finalTotal,
       paymentMethod: paymentLabel,
-      address: formattedAddr
+      address: formattedAddr,
+      deliveryAddress: formattedAddr,
+      delivery_address: formattedAddr
     });
   };
 

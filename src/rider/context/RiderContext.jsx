@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { fetchRiderDeliveries, updateOrderStatusInSupabase, assignStoreToAnyStoreOrder } from '../../services/orderService';
+import { 
+  fetchRiderDeliveries, 
+  updateOrderStatusInSupabase, 
+  assignStoreToAnyStoreOrder, 
+  claimRiderOrderInSupabase 
+} from '../../services/orderService';
 import { get10DigitPhone } from '../../services/authService';
 import { updateRiderOnlineStatusInSupabase } from '../../services/riderService';
 import { 
@@ -269,42 +274,42 @@ export const RiderProvider = ({ children }) => {
             },
             async (payload) => {
               const newOrder = payload.new;
-              if (newOrder && isOnline && !activeDelivery) {
-                // Fetch store details
-                let storeName = newOrder.store_name || 'Local Grocery Store';
-                let storePhone = '+91 81238 21300';
-                let storeAddress = 'Market Road, Chikkamagaluru';
+              // USE CASE 2 ONLY: Only broadcast "Shop From Any Store" orders to riders!
+              const isAnyStoreOrder = newOrder && (newOrder.fulfillment_mode === 'shop_any_store' || !newOrder.store_id);
+              if (isAnyStoreOrder && isOnline && !activeDelivery) {
+                const parsedItems = Array.isArray(newOrder.items)
+                  ? newOrder.items.map(i => typeof i === 'string' ? { name: i, quantity: 1, unit: '1 unit', price: 0 } : {
+                      name: i.name || i.product_name || i.itemName,
+                      quantity: i.quantity || i.qty || 1,
+                      unit: i.unit || i.quantityUnit || '1 unit',
+                      price: i.price || 0,
+                      isManual: i.isManual || !i.product_id
+                    })
+                  : [];
 
-                if (newOrder.store_id) {
-                  const { data: shopRow } = await supabase
-                    .from('shops')
-                    .select('*')
-                    .eq('id', newOrder.store_id)
-                    .maybeSingle();
-
-                  if (shopRow) {
-                    storeName = shopRow.name || storeName;
-                    storePhone = shopRow.phone || shopRow.shopkeeper_phone || storePhone;
-                    storeAddress = shopRow.address || storeAddress;
-                  }
-                }
+                const itemsList = parsedItems.length > 0
+                  ? parsedItems.map(i => `${i.name} (${i.quantity} ${i.unit})`)
+                  : ['Grocery Items'];
 
                 const notifObj = {
                   id: `order-notif-${newOrder.id}`,
                   order_id: newOrder.id,
                   payload: {
                     orderId: newOrder.id,
-                    storeName,
-                    storePhone,
-                    storeAddress,
+                    storeName: 'Shop From Any Store (Rider Choice)',
+                    storePhone: '+91 81238 21300',
+                    storeAddress: 'Market Road, Chikkamagaluru',
                     customerName: newOrder.customer_name || 'Customer',
                     customerPhone: newOrder.customer_phone || 'Phone not provided',
                     deliveryAddress: newOrder.delivery_address || 'Chikkamagaluru, Karnataka',
-                    itemCount: Array.isArray(newOrder.items) ? newOrder.items.length : 1,
-                    items: Array.isArray(newOrder.items) ? newOrder.items.map(i => typeof i === 'string' ? i : `${i.name || i.product_name || 'Item'} (${i.quantity || 1})`) : ['Grocery Items'],
+                    itemCount: itemsList.length,
+                    items: itemsList,
+                    parsedItems: parsedItems,
+                    fulfillment_mode: 'shop_any_store',
+                    isAnyStore: true,
                     totalAmount: newOrder.total_amount || 0,
                     paymentStatus: newOrder.payment_method || 'Cash on Delivery',
-                    estimatedEarnings: 65,
+                    estimatedEarnings: 85,
                     distance: '1.8 km',
                     estimatedTime: 'Delivery after 4:00 PM'
                   }

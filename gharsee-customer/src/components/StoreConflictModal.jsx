@@ -52,7 +52,7 @@ export default function StoreConflictModal() {
 
           <button
             type="button"
-            onClick={confirmSwitchStore}
+            onClick={() => confirmSwitchStore(storeConflictModal.targetStore, storeConflictModal.pendingItem)}
             className="py-3 px-4 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors"
           >
             SWITCH STORE

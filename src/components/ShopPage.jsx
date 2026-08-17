@@ -14,9 +14,9 @@ export default function ShopPage({ searchQuery, onSearchQuery, selectedCategory,
       // Search match
       if (searchQuery && searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase().trim();
-        const matchesName = product.name.toLowerCase().includes(query);
-        const matchesCat = product.category.toLowerCase().includes(query);
-        const matchesBrand = product.brand.toLowerCase().includes(query);
+        const matchesName = (product.name || '').toLowerCase().includes(query);
+        const matchesCat = (product.category || '').toLowerCase().includes(query);
+        const matchesBrand = (product.brand || '').toLowerCase().includes(query);
         if (!matchesName && !matchesCat && !matchesBrand) return false;
       }
 

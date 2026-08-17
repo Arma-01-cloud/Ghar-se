@@ -76,7 +76,7 @@ export async function createOrderInSupabase(orderData) {
     let customerPhone = orderData.customerPhone || orderData.phone || savedPhone;
     let customerName = orderData.customerName || orderData.name || savedName || 'Customer';
     
-    let deliveryAddress = orderData.address || orderData.delivery_address || orderData.locationName || '';
+    let deliveryAddress = orderData.deliveryAddress || orderData.address || orderData.delivery_address || orderData.locationName || '';
     if (!deliveryAddress || deliveryAddress === 'Customer Address') {
       try {
         const savedLoc = JSON.parse(localStorage.getItem('gharsee_current_location') || '{}');
@@ -153,7 +153,15 @@ export async function createOrderInSupabase(orderData) {
       console.error('Supabase createOrder error:', orderErr.message);
     }
 
-    const finalOrder = insertedOrder || { ...orderData, customerName, customerPhone, storeName };
+    const finalOrder = insertedOrder || {
+      ...orderData,
+      customerName,
+      customerPhone,
+      storeName,
+      delivery_address: deliveryAddress,
+      deliveryAddress: deliveryAddress,
+      address: deliveryAddress
+    };
 
     // 4. Insert item rows into order_items table (handles both catalog products & manual items)
     if (orderData.items && orderData.items.length > 0) {
@@ -173,19 +181,32 @@ export async function createOrderInSupabase(orderData) {
       await supabase.from('order_items').insert(itemRows);
     }
 
-    // 5. Build WhatsApp notification link & message for shopkeeper
-    const whatsappData = generateShopkeeperWhatsAppUrl(
-      shopkeeperPhone,
-      finalOrder,
-      customerName,
-      customerPhone
-    );
+    // 5. USE CASE 1 (Store Selected): Send order & product list strictly to selected shopkeeper via WhatsApp & store portal
+    let whatsappData = { whatsappUrl: '', whatsappMessage: '' };
+    if (!isAnyStore && shopkeeperPhone) {
+      whatsappData = generateShopkeeperWhatsAppUrl(
+        shopkeeperPhone,
+        finalOrder,
+        customerName,
+        customerPhone
+      );
+    }
 
-    // 6. Broadcast Real-Time Notification to Online Riders in Supabase
-    await broadcastOrderToRidersInSupabase(finalOrder);
+    // 6. USE CASE 2 (Shop From Any Store): Broadcast order & product list to online riders (first-accept-wins)
+    if (isAnyStore) {
+      await broadcastOrderToRidersInSupabase(finalOrder);
+    }
 
     return {
-      order: finalOrder,
+      order: {
+        ...finalOrder,
+        address: deliveryAddress,
+        deliveryAddress: deliveryAddress,
+        delivery_address: deliveryAddress,
+        customerName,
+        customerPhone,
+        storeName
+      },
       shopkeeperPhone,
       whatsappUrl: whatsappData.whatsappUrl,
       whatsappMessage: whatsappData.whatsappMessage
@@ -282,6 +303,10 @@ export async function fetchShopkeeperOrders(shopId = null) {
 
       return {
         id: o.id,
+        store_id: o.store_id,
+        storeId: o.store_id,
+        store_name: o.store_name,
+        storeName: o.store_name,
         customerName: o.customer_name || 'Customer',
         customerPhone: phoneNum,
         phone: phoneNum,

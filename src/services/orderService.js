@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { get10DigitPhone } from './authService';
 import { broadcastOrderToRidersInSupabase } from '../rider/services/notificationService';
+import { isValidOrderStatus, isValidOrderStatusTransition, validateOrderPayload } from '../utils/validators';
 
 // Build WhatsApp notification URL & text for Shopkeeper
 export function generateShopkeeperWhatsAppUrl(shopkeeperPhone, order, customerName, customerPhone) {
@@ -51,6 +52,19 @@ ${storeOrderLink}`;
 
 // Create a new order in Supabase orders and order_items tables & broadcast notification to riders
 export async function createOrderInSupabase(orderData) {
+  // Client-side validation — never trust the cart payload.
+  const validation = validateOrderPayload(orderData);
+  if (!validation.ok) {
+    console.warn('Order payload validation failed:', validation.errors);
+    return {
+      order: orderData,
+      shopkeeperPhone: '+918123821300',
+      whatsappUrl: '',
+      whatsappMessage: '',
+      error: validation.errors[0] || 'Invalid order'
+    };
+  }
+
   if (!isSupabaseConfigured) {
     const defaultWhatsApp = generateShopkeeperWhatsAppUrl(
       '+918123821300',
@@ -76,7 +90,7 @@ export async function createOrderInSupabase(orderData) {
     let customerPhone = orderData.customerPhone || orderData.phone || savedPhone;
     let customerName = orderData.customerName || orderData.name || savedName || 'Customer';
     
-    let deliveryAddress = orderData.address || orderData.delivery_address || orderData.locationName || '';
+    let deliveryAddress = orderData.deliveryAddress || orderData.address || orderData.delivery_address || orderData.locationName || '';
     if (!deliveryAddress || deliveryAddress === 'Customer Address') {
       try {
         const savedLoc = JSON.parse(localStorage.getItem('gharsee_current_location') || '{}');
@@ -153,7 +167,15 @@ export async function createOrderInSupabase(orderData) {
       console.error('Supabase createOrder error:', orderErr.message);
     }
 
-    const finalOrder = insertedOrder || { ...orderData, customerName, customerPhone, storeName };
+    const finalOrder = insertedOrder || {
+      ...orderData,
+      customerName,
+      customerPhone,
+      storeName,
+      delivery_address: deliveryAddress,
+      deliveryAddress: deliveryAddress,
+      address: deliveryAddress
+    };
 
     // 4. Insert item rows into order_items table (handles both catalog products & manual items)
     if (orderData.items && orderData.items.length > 0) {
@@ -173,19 +195,32 @@ export async function createOrderInSupabase(orderData) {
       await supabase.from('order_items').insert(itemRows);
     }
 
-    // 5. Build WhatsApp notification link & message for shopkeeper
-    const whatsappData = generateShopkeeperWhatsAppUrl(
-      shopkeeperPhone,
-      finalOrder,
-      customerName,
-      customerPhone
-    );
+    // 5. USE CASE 1 (Store Selected): Send order & product list strictly to selected shopkeeper via WhatsApp & store portal
+    let whatsappData = { whatsappUrl: '', whatsappMessage: '' };
+    if (!isAnyStore && shopkeeperPhone) {
+      whatsappData = generateShopkeeperWhatsAppUrl(
+        shopkeeperPhone,
+        finalOrder,
+        customerName,
+        customerPhone
+      );
+    }
 
-    // 6. Broadcast Real-Time Notification to Online Riders in Supabase
-    await broadcastOrderToRidersInSupabase(finalOrder);
+    // 6. USE CASE 2 (Shop From Any Store): Broadcast order & product list to online riders (first-accept-wins)
+    if (isAnyStore) {
+      await broadcastOrderToRidersInSupabase(finalOrder);
+    }
 
     return {
-      order: finalOrder,
+      order: {
+        ...finalOrder,
+        address: deliveryAddress,
+        deliveryAddress: deliveryAddress,
+        delivery_address: deliveryAddress,
+        customerName,
+        customerPhone,
+        storeName
+      },
       shopkeeperPhone,
       whatsappUrl: whatsappData.whatsappUrl,
       whatsappMessage: whatsappData.whatsappMessage
@@ -282,6 +317,10 @@ export async function fetchShopkeeperOrders(shopId = null) {
 
       return {
         id: o.id,
+        store_id: o.store_id,
+        storeId: o.store_id,
+        store_name: o.store_name,
+        storeName: o.store_name,
         customerName: o.customer_name || 'Customer',
         customerPhone: phoneNum,
         phone: phoneNum,
@@ -420,10 +459,55 @@ export async function claimRiderOrderInSupabase(orderId, riderId, riderName = ''
 }
 
 // Update Order Status in Supabase with timestamp support
-export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = null) {
+// Performs a read-then-conditional-update so a client can't fast-forward an
+// order through the workflow by sending an arbitrary status, and so a
+// shopkeeper can only touch their own orders.
+export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = null, storeId = null) {
   if (!isSupabaseConfigured) return true;
 
+  if (!isValidOrderStatus(newStatus)) {
+    console.warn('updateOrderStatusInSupabase: invalid status', newStatus);
+    return false;
+  }
+
   try {
+    // Read current status to validate the transition client-side. This is
+    // defense-in-depth: the database is still the source of truth and should
+    // also enforce the workflow via a trigger or check constraint.
+    const { data: current, error: readErr } = await supabase
+      .from('orders')
+      .select('id, status, rider_id, store_id')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (readErr) {
+      console.warn('updateOrderStatusInSupabase: read failed', readErr.message);
+      return false;
+    }
+
+    if (current && current.status && !isValidOrderStatusTransition(current.status, newStatus)) {
+      console.warn(
+        `updateOrderStatusInSupabase: refused transition ${current.status} -> ${newStatus} for order ${orderId}`
+      );
+      return false;
+    }
+
+    // Authorization: a rider may only update orders assigned to them.
+    if (riderId && current && current.rider_id && String(current.rider_id) !== String(riderId)) {
+      console.warn(
+        `updateOrderStatusInSupabase: rider ${riderId} tried to update order ${orderId} assigned to ${current.rider_id}`
+      );
+      return false;
+    }
+
+    // Authorization: a shopkeeper may only update orders that belong to their store.
+    if (storeId && current && current.store_id && String(current.store_id) !== String(storeId)) {
+      console.warn(
+        `updateOrderStatusInSupabase: shop ${storeId} tried to update order ${orderId} belonging to ${current.store_id}`
+      );
+      return false;
+    }
+
     const updateData = { status: newStatus };
     if (riderId) {
       updateData.rider_id = riderId;
@@ -432,10 +516,18 @@ export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = 
       updateData.delivered_at = new Date().toISOString();
     }
 
-    const { error } = await supabase
-      .from('orders')
-      .update(updateData)
-      .eq('id', orderId);
+    let query = supabase.from('orders').update(updateData).eq('id', orderId);
+
+    // Belt-and-braces: when called as a shopkeeper, also constrain the WHERE
+    // clause so the SQL update cannot leak across stores.
+    if (storeId) {
+      query = query.eq('store_id', storeId);
+    }
+    if (riderId) {
+      query = query.eq('rider_id', riderId);
+    }
+
+    const { error } = await query;
 
     return !error;
   } catch {

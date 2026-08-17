@@ -164,6 +164,25 @@ export default function ShopkeeperStorePage() {
     };
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (storeProfile) {
+      setForm(prev => ({
+        ...prev,
+        name: storeProfile.name || prev.name,
+        ownerName: storeProfile.ownerName || storeProfile.owner_name || prev.ownerName,
+        phone: storeProfile.phone || prev.phone,
+        email: storeProfile.email || prev.email,
+        locality: storeProfile.locality || prev.locality,
+        city: storeProfile.city || prev.city,
+        state: storeProfile.state || prev.state,
+        pincode: storeProfile.pincode || prev.pincode,
+        image: storeProfile.image || storeProfile.image_url || prev.image,
+        latitude: storeProfile.latitude || prev.latitude,
+        longitude: storeProfile.longitude || prev.longitude
+      }));
+    }
+  }, [storeProfile]);
+
   const isExistingStore = Boolean(storeProfile && storeProfile.id);
 
   // Process and optimize uploaded image file
