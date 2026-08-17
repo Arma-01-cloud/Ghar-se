@@ -159,7 +159,7 @@ export default function RiderIncomingRequestModal({ notification, onAccept, onDe
                 key={idx} 
                 className="bg-stone-800/90 border border-stone-700 text-stone-200 text-[11px] font-bold px-2 py-0.5 rounded-lg"
               >
-                {typeof itemStr === 'string' ? itemStr : `${itemStr.name} (${itemStr.quantity} ${itemStr.unit})`}
+                {typeof itemStr === 'string' ? itemStr : `${itemStr.name} (Quantity: ${itemStr.quantity || 1}, Weight: ${itemStr.unit || '1 unit'})`}
               </span>
             ))}
           </div>

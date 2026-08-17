@@ -1,5 +1,5 @@
 -- ============================================================
--- GHARSEE FRESH — SUPABASE RLS SECURITY & ROLE-LOCK POLICIES
+-- GHARSEE — SUPABASE RLS SECURITY & ROLE-LOCK POLICIES
 -- ============================================================
 
 -- 1. ENABLE RLS ON ALL TABLES

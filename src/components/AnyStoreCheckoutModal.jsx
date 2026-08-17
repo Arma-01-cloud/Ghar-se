@@ -336,11 +336,11 @@ export default function AnyStoreCheckoutModal({
               {requestCart.map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between py-1.5 first:pt-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-stone-900 truncate max-w-[170px] sm:max-w-xs">{item.name}</span>
+                    <span className="font-bold text-stone-900 truncate max-w-[160px] sm:max-w-xs">{item.name}</span>
                     <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
-                      {item.unit}
+                      Weight: {item.unit}
                     </span>
-                    <span className="text-stone-400 text-[11px]">× {item.quantity}</span>
+                    <span className="text-stone-600 text-[11px] font-bold">Qty: {item.quantity}</span>
                   </div>
                   <span className="font-extrabold text-stone-900">₹{item.price * item.quantity}</span>
                 </div>

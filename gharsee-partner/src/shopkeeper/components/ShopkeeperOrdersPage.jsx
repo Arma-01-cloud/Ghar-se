@@ -230,7 +230,7 @@ export default function ShopkeeperOrdersPage() {
                   <div className="sm:col-span-5">
                     <span className="text-[10px] text-stone-400 font-bold uppercase block">Order Contents ({order.items.length} items)</span>
                     <p className="font-semibold text-stone-800 line-clamp-1">
-                      {order.items.map(i => `${i.qty || i.quantity}x ${i.name}`).join(', ')}
+                      {order.items.map(i => `${i.name} (Quantity: ${i.qty || i.quantity || 1}, Weight: ${i.unit || '1 unit'})`).join(', ')}
                     </p>
                     <p className="text-[11px] text-stone-400 truncate">{order.deliveryAddress}</p>
                   </div>

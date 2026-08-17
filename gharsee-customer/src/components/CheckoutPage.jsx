@@ -288,13 +288,18 @@ export default function CheckoutPage() {
             <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 text-xs">
               {cart.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center font-semibold text-stone-800">
-                  <span className="truncate max-w-[170px]">
-                    {item.quantity}x {item.product.name}
-                    {!item.product.id || (typeof item.product.id === 'string' && item.product.id.length < 20) ? (
-                      <span className="text-[10px] text-amber-700 font-bold ml-1">(Manual Item)</span>
-                    ) : null}
-                  </span>
-                  <span className="font-bold text-stone-900">₹{item.product.price * item.quantity}</span>
+                  <div className="truncate max-w-[190px] space-y-0.5">
+                    <span className="font-bold text-stone-900 block truncate">
+                      {item.product.name}
+                      {!item.product.id || (typeof item.product.id === 'string' && item.product.id.length < 20) ? (
+                        <span className="text-[10px] text-amber-700 font-bold ml-1">(Manual Item)</span>
+                      ) : null}
+                    </span>
+                    <span className="text-[10px] text-stone-500 font-medium block">
+                      Quantity: <strong className="text-stone-700 font-bold">{item.quantity}</strong> • Weight: <strong className="text-stone-700 font-bold">{item.product.unit || '1 unit'}</strong>
+                    </span>
+                  </div>
+                  <span className="font-bold text-stone-900 shrink-0 ml-2">₹{item.product.price * item.quantity}</span>
                 </div>
               ))}
             </div>

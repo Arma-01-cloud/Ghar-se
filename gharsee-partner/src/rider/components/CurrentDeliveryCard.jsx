@@ -225,10 +225,10 @@ export default function CurrentDeliveryCard({ delivery }) {
                     </span>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="bg-emerald-100 text-emerald-900 text-[10px] font-black px-1.5 py-0.2 rounded border border-emerald-300">
-                        {itemUnit}
+                        Weight: {itemUnit}
                       </span>
-                      <span className="text-[11px] text-stone-500 font-bold">
-                        Qty: ×{itemQty}
+                      <span className="text-[11px] text-stone-600 font-bold">
+                        Quantity: {itemQty}
                       </span>
                       {item.isManual && (
                         <span className="text-[9px] bg-amber-100 text-amber-900 px-1 rounded font-extrabold uppercase">

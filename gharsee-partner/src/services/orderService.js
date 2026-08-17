@@ -2,21 +2,48 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { get10DigitPhone } from './authService';
 import { broadcastOrderToRidersInSupabase } from '../rider/services/notificationService';
 
+// Resolve base URL for partner app (supports VITE_PARTNER_APP_URL, VITE_PARTNER_URL, Vercel multi-subdomain patterns, and current origin fallback)
+export function getPartnerAppBaseUrl() {
+  const envPartnerUrl = (
+    (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_PARTNER_APP_URL || import.meta.env.VITE_PARTNER_URL)) || ''
+  ).trim().replace(/\/+$/, '');
+
+  if (envPartnerUrl) {
+    return envPartnerUrl;
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    const origin = window.location.origin;
+    // Replace customer deployment host with partner deployment host if on customer domain
+    if (origin.includes('gharsee-customer')) {
+      return origin.replace('gharsee-customer', 'gharsee-partner');
+    }
+    if (origin.includes('customer.')) {
+      return origin.replace('customer.', 'partner.');
+    }
+    return origin;
+  }
+
+  return 'https://gharsee-partner.vercel.app';
+}
+
 // Build WhatsApp notification URL & text for Shopkeeper
 export function generateShopkeeperWhatsAppUrl(shopkeeperPhone, order, customerName, customerPhone) {
   const cleanDigits = get10DigitPhone(shopkeeperPhone) || '8123821300';
   const targetPhone = `91${cleanDigits}`;
 
-  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://gharsee.app';
-  const storeOrderLink = `${originUrl}/partner?orderId=${order.id}`;
+  const partnerBase = getPartnerAppBaseUrl();
+  const storeOrderLink = `${partnerBase}/shopkeeper?orderId=${order.id}`;
 
   let itemsFormatted = '';
   if (order.items && order.items.length > 0) {
     itemsFormatted = order.items.map((item, idx) => {
       const isManual = !item.id || (typeof item.id === 'string' && item.id.length < 20) || item.isManual;
       const tag = isManual ? ' (Manual Item)' : '';
-      const qtyStr = `${item.quantity || item.qty || 1} ${item.unit || 'unit'}`;
-      return `${idx + 1}. ${item.name || item.itemName || 'Grocery Item'} × ${qtyStr}${tag}`;
+      const qty = item.quantity || item.qty || 1;
+      const weight = item.unit || item.quantityUnit || '1 unit';
+      const priceStr = item.price ? ` - ₹${item.price * qty}` : '';
+      return `${idx + 1}. *${item.name || item.itemName || 'Grocery Item'}* (Quantity: ${qty}, Weight: ${weight})${priceStr}${tag}`;
     }).join('\n');
   } else {
     itemsFormatted = '1. Grocery Items';
@@ -38,14 +65,15 @@ ${order.address || order.deliveryAddress || 'Address not provided'}
 
 *Total Amount:* ₹${order.totalAmount || order.total || 0} (${order.paymentMethod || 'Cash on Delivery'})
 
-Please open the shopkeeper order portal to view and process the order:
+Please open the shopkeeper partner portal to view and process the order:
 ${storeOrderLink}`;
 
   const encodedMessage = encodeURIComponent(messageText);
   return {
     whatsappUrl: `https://wa.me/${targetPhone}?text=${encodedMessage}`,
     whatsappMessage: messageText,
-    targetPhone
+    targetPhone,
+    storeOrderLink
   };
 }
 

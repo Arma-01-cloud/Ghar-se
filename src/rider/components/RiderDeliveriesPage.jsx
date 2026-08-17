@@ -127,7 +127,7 @@ export default function RiderDeliveriesPage() {
                       <div className="flex flex-wrap gap-1.5">
                         {rawItems.map((it, idx) => (
                           <span key={idx} className="bg-white border border-stone-200 px-2.5 py-1 rounded-xl text-[11px] font-bold text-stone-800 shadow-2xs">
-                            {typeof it === 'string' ? it : `${it.name || it.product_name} (${it.quantity || 1} ${it.unit || 'unit'})`}
+                            {typeof it === 'string' ? it : `${it.name || it.product_name} (Quantity: ${it.quantity || 1}, Weight: ${it.unit || '1 unit'})`}
                           </span>
                         ))}
                       </div>

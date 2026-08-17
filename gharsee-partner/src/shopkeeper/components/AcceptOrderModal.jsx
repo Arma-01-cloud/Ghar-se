@@ -40,9 +40,11 @@ export default function AcceptOrderModal({ order, onClose }) {
 
         <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 max-h-36 overflow-y-auto space-y-1 text-xs">
           {order.items.map((item, idx) => (
-            <div key={idx} className="flex justify-between font-semibold">
-              <span className="text-stone-700">{item.qty}x {item.name}</span>
-              <span className="text-stone-900 font-bold">₹{item.price * item.qty}</span>
+            <div key={idx} className="flex justify-between font-semibold items-center">
+              <span className="text-stone-700">
+                {item.name} <span className="text-stone-500 font-normal text-[11px]">(Quantity: {item.qty || item.quantity || 1}, Weight: {item.unit || '1 unit'})</span>
+              </span>
+              <span className="text-stone-900 font-bold shrink-0 ml-2">₹{(item.price || 0) * (item.qty || item.quantity || 1)}</span>
             </div>
           ))}
         </div>

@@ -166,7 +166,7 @@ export default function AdminOrdersTab() {
                         key={idx}
                         className="text-[11px] font-semibold bg-stone-100 text-stone-800 px-2 py-0.5 rounded-lg border border-stone-200"
                       >
-                        {item.name || item.itemName} × {item.quantity || item.qty || 1}
+                        {item.name || item.itemName} (Quantity: {item.quantity || item.qty || 1}, Weight: {item.unit || '1 unit'})
                       </span>
                     ))}
                     {order.items.length > 4 && (

@@ -32,7 +32,7 @@ export default function WhyUs() {
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700">OUR COMMITMENT</span>
           <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-stone-900">
-            Why Choose GharSee Fresh?
+            Why Choose GharSee?
           </h2>
           <p className="text-stone-500 text-sm">
             Experience the gold standard in fresh local grocery commerce & convenient list conversion.

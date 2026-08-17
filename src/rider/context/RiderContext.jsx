@@ -288,7 +288,7 @@ export const RiderProvider = ({ children }) => {
                   : [];
 
                 const itemsList = parsedItems.length > 0
-                  ? parsedItems.map(i => `${i.name} (${i.quantity} ${i.unit})`)
+                  ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
                   : ['Grocery Items'];
 
                 const notifObj = {

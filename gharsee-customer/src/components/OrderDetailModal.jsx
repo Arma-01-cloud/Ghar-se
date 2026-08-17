@@ -102,7 +102,7 @@ export default function OrderDetailModal({ order, onClose }) {
                   <img src={item.image || '/images/cat_veg_fruits.jpg'} alt="" className="w-10 h-10 object-cover rounded-xl bg-stone-100" />
                   <div>
                     <h5 className="font-extrabold text-xs text-stone-900">{item.name}</h5>
-                    <p className="text-[11px] text-stone-500">Qty: {item.quantity || item.qty} ({item.unit || 'unit'})</p>
+                    <p className="text-[11px] text-stone-500">Quantity: <strong className="text-stone-700 font-bold">{item.quantity || item.qty || 1}</strong> • Weight: <strong className="text-stone-700 font-bold">{item.unit || '1 unit'}</strong></p>
                   </div>
                 </div>
                 <span className="font-extrabold text-sm text-stone-900">₹{(item.price || 0) * (item.quantity || item.qty || 1)}</span>

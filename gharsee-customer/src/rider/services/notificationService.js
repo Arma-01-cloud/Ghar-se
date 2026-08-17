@@ -33,7 +33,7 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
     }
 
     const itemsList = Array.isArray(orderData.items)
-      ? orderData.items.map(i => `${i.name || i.itemName || 'Item'} (${i.quantity || i.qty || 1} ${i.unit || 'unit'})`)
+      ? orderData.items.map(i => `${i.name || i.itemName || 'Item'} (Quantity: ${i.quantity || i.qty || 1}, Weight: ${i.unit || '1 unit'})`)
       : ['Grocery Items'];
 
     const payload = {

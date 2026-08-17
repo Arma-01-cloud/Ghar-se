@@ -1,5 +1,5 @@
 -- ============================================================================
--- GHARSEE FRESH DATABASE SETUP MIGRATION WITH SEED DATA
+-- GHARSEE DATABASE SETUP MIGRATION WITH SEED DATA
 -- Creates schema for Customer, Shopkeeper, and Rider Roles & Workflows
 -- ============================================================================
 

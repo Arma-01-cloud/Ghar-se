@@ -45,9 +45,6 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
                   <span className="font-display font-black text-xl sm:text-2xl tracking-tight text-emerald-950">
                     Ghar<span className="text-emerald-600">See</span>
                   </span>
-                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wider hidden sm:inline-block">
-                    Fresh
-                  </span>
                 </div>
                 <span className="text-[10px] sm:text-[11px] text-stone-500 font-semibold tracking-wide hidden xs:inline leading-none mt-0.5">
                   Local Groceries Delivered

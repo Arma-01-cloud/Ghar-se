@@ -58,7 +58,7 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
       : [];
 
     const itemsList = parsedItems.length > 0
-      ? parsedItems.map(i => `${i.name} (${i.quantity} ${i.unit})`)
+      ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
       : ['Grocery Items'];
 
     const isAnyStore = orderData.fulfillment_mode === 'shop_any_store' || !orderData.store_id;

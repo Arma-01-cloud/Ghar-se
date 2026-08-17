@@ -146,7 +146,7 @@ export default function ShopkeeperOrderDetailModal() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-stone-400">Quantity: {item.qty || item.quantity} {item.unit || 'unit'} • ₹{item.price} each</p>
+                  <p className="text-[11px] text-stone-500 font-medium">Quantity: <strong className="text-stone-800 font-bold">{item.qty || item.quantity || 1}</strong> • Weight: <strong className="text-stone-800 font-bold">{item.unit || '1 unit'}</strong> • ₹{item.price || 0} each</p>
                   
                   {/* REPLACEMENT PREFERENCE */}
                   <div className="text-[11px] font-bold text-stone-600 flex items-center gap-1 pt-0.5">
@@ -160,7 +160,7 @@ export default function ShopkeeperOrderDetailModal() {
                 </div>
 
                 <div className="text-right">
-                  <span className="text-stone-500 mr-4 font-bold">{item.qty || item.quantity}x</span>
+                  <span className="text-stone-500 mr-4 font-bold">Qty: {item.qty || item.quantity || 1}</span>
                   <span className="font-black text-stone-900 text-sm">₹{(item.price || 0) * (item.qty || item.quantity || 1)}</span>
                 </div>
               </div>

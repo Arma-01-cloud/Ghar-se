@@ -1,5 +1,5 @@
 -- ============================================================
--- GHARSEE FRESH — SUPABASE INITIAL DATABASE SCHEMA
+-- GHARSEE — SUPABASE INITIAL DATABASE SCHEMA
 -- ============================================================
 
 -- 1. PROFILES TABLE (Linked to Supabase Auth users)

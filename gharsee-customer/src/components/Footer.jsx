@@ -26,7 +26,7 @@ export default function Footer() {
                 <Leaf className="w-6 h-6 stroke-[2.5]" />
               </div>
               <span className="font-display font-black text-2xl text-white tracking-tight">
-                Ghar<span className="text-emerald-400">See</span> Fresh
+                Ghar<span className="text-emerald-400">See</span>
               </span>
             </div>
 
@@ -108,7 +108,7 @@ export default function Footer() {
 
         {/* BOTTOM COPYRIGHT */}
         <div className="pt-8 border-t border-emerald-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-400">
-          <p>© {new Date().getFullYear()} GharSee Fresh Technologies Pvt Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} GharSee Technologies Pvt Ltd. All rights reserved.</p>
           <div className="flex items-center gap-4 text-stone-400 text-xs">
             <span>UPI</span>
             <span>GPay</span>

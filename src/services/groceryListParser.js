@@ -121,7 +121,7 @@ export async function parseGroceryListImage(imageFileOrUrl, progressCallback) {
       console.warn('Tesseract OCR fallback activated:', ocrErr);
     }
 
-    if (progressCallback) progressCallback({ status: 'matching', progress: 95, text: 'Matching products with GharSee Fresh catalog...' });
+    if (progressCallback) progressCallback({ status: 'matching', progress: 95, text: 'Matching products with GharSee catalog...' });
 
     // Artificial delay for smooth UX transition if fast
     await new Promise(r => setTimeout(r, 600));

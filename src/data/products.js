@@ -172,7 +172,7 @@ export const PRODUCTS = [
     image: '/images/cat_dairy.jpg',
     unit: '200 g',
     stock: 50,
-    brand: 'GharSee Fresh',
+    brand: 'GharSee',
     isPopular: true
   },
 
