@@ -97,7 +97,8 @@ ${displayCustPhone}
 *Order ID:*
 #${orderId}
 
-Please open your GharSee Partner dashboard to view and process the order.`;
+Please open your GharSee Partner dashboard to view and process the order:
+https://ghar-se-partner-git-main-ssa12.vercel.app/`;
 
   const encodedMessage = encodeURIComponent(messageText);
 

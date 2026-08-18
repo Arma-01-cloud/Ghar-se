@@ -27,7 +27,7 @@ export function getPartnerAppBaseUrl() {
     return origin;
   }
 
-  return 'https://gharsee-partner.vercel.app';
+  return 'https://ghar-se-partner-git-main-ssa12.vercel.app';
 }
 
 // Build WhatsApp notification URL & text for Shopkeeper
@@ -73,7 +73,8 @@ ${order.address || order.deliveryAddress || 'Address not provided'}
 
 *Total Amount:* ₹${order.totalAmount || order.total || 0} (${order.paymentMethod || 'Cash on Delivery'})
 
-Please open your GharSee Partner dashboard to view and process the order.`;
+Please open your GharSee Partner dashboard to view and process the order:
+https://ghar-se-partner-git-main-ssa12.vercel.app/`;
 
   const encodedMessage = encodeURIComponent(messageText);
   return {
