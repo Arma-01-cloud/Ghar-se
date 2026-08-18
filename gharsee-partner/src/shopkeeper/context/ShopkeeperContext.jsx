@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { fetchShopkeeperOrders, updateOrderStatusInSupabase } from '../../services/orderService';
 import { fetchProductsByStore, updateProductStockInSupabase } from '../../services/productService';
+import { updateStoreStatus, updateStoreInSupabase } from '../../services/storeService';
 import { validateStatusTransition } from '../services/shopkeeperService';
 import { get10DigitPhone } from '../../services/authService';
 
@@ -283,9 +284,38 @@ export const ShopkeeperProvider = ({ children }) => {
     setStoreProfile(prev => {
       if (!prev) return prev;
       const newStatus = !prev.isOpen;
-      const updated = { ...prev, isOpen: newStatus };
-      try { localStorage.setItem('gharsee_store_profile', JSON.stringify(updated)); } catch {}
+      const updated = { 
+        ...prev, 
+        isOpen: newStatus,
+        is_open: newStatus,
+        status: newStatus ? 'open' : 'closed' 
+      };
+
+      try { 
+        localStorage.setItem('gharsee_store_profile', JSON.stringify(updated)); 
+        localStorage.setItem('gharsee_store_status_update', JSON.stringify({
+          storeId: prev.id,
+          isOpen: newStatus,
+          status: newStatus ? 'open' : 'closed',
+          timestamp: Date.now()
+        }));
+        window.dispatchEvent(new CustomEvent('gharsee_store_status_changed', { 
+          detail: { 
+            storeId: prev.id, 
+            isOpen: newStatus, 
+            status: newStatus ? 'open' : 'closed' 
+          } 
+        }));
+      } catch {}
+
       addShopkeeperToast(`Store status updated: ${newStatus ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}`, 'info');
+
+      if (prev.id) {
+        updateStoreStatus(prev.id, newStatus).catch(err => {
+          console.error('Failed to sync store status to Supabase:', err);
+        });
+      }
+
       return updated;
     });
   };
@@ -293,7 +323,16 @@ export const ShopkeeperProvider = ({ children }) => {
   const updateStoreProfile = (newDetails) => {
     setStoreProfile(prev => {
       const updated = { ...prev, ...newDetails };
-      try { localStorage.setItem('gharsee_store_profile', JSON.stringify(updated)); } catch {}
+      try { 
+        localStorage.setItem('gharsee_store_profile', JSON.stringify(updated)); 
+        window.dispatchEvent(new CustomEvent('gharsee_store_status_changed', { 
+          detail: { 
+            storeId: updated.id, 
+            isOpen: updated.isOpen, 
+            status: updated.status 
+          } 
+        }));
+      } catch {}
       return updated;
     });
     addShopkeeperToast('Store profile updated successfully!', 'success');

@@ -77,13 +77,20 @@ export async function fetchStores(customerLat = 13.3161, customerLon = 75.7720, 
         ? (dbPhone.startsWith('+') ? dbPhone : `+91 ${dbPhone.replace(/\D/g, '').slice(-10)}`)
         : DEFAULT_SHOPKEEPER_PHONES[idx % DEFAULT_SHOPKEEPER_PHONES.length];
 
+      const isStoreOpen = s.is_open != null 
+        ? Boolean(s.is_open) 
+        : (s.status ? (s.status.toLowerCase() === 'open' || s.status.toLowerCase() === 'active') : true);
+      const statusText = isStoreOpen ? 'Open' : 'Closed';
+
       return {
         id: s.id,
         name: s.name,
         image: s.image_url || (idx % 2 === 0 ? '/images/store_lakshmi.jpg' : '/images/store_freshmart.jpg'),
         rating: s.rating || 5.0,
         reviews: s.reviews || (150 + idx * 45),
-        isOpen: s.status === 'open' || s.status === 'active' || true,
+        isOpen: isStoreOpen,
+        is_open: isStoreOpen,
+        status: statusText,
         closingTime: s.closing_time || '10:00 PM',
         openingTime: s.opening_time || '07:00 AM',
         address: s.address || (localityName ? `Market Road, ${localityName}` : 'Chikkamagaluru, Karnataka'),
@@ -185,9 +192,12 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
 // Update store profile & status in Supabase
 export async function updateStoreInSupabase(storeId, updatedFields) {
   if (!isSupabaseConfigured) return true;
+  if (!storeId) return false;
 
   try {
-    const payload = {};
+    const payload = {
+      updated_at: new Date().toISOString()
+    };
     if (updatedFields.name) payload.name = updatedFields.name;
     if (updatedFields.phone) payload.phone = updatedFields.phone;
     if (updatedFields.address) payload.address = updatedFields.address;
@@ -199,7 +209,12 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
     if (updatedFields.latitude != null) payload.latitude = parseFloat(updatedFields.latitude);
     if (updatedFields.longitude != null) payload.longitude = parseFloat(updatedFields.longitude);
     if (updatedFields.image || updatedFields.image_url) payload.image_url = updatedFields.image || updatedFields.image_url;
-    if (updatedFields.isOpen != null) payload.is_open = updatedFields.isOpen;
+    if (updatedFields.isOpen != null) {
+      payload.is_open = Boolean(updatedFields.isOpen);
+      if (!updatedFields.status) {
+        payload.status = updatedFields.isOpen ? 'open' : 'closed';
+      }
+    }
     if (updatedFields.status) payload.status = updatedFields.status;
 
     const { error } = await supabase
@@ -214,5 +229,8 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
 }
 
 export async function updateStoreStatus(storeId, isOpen) {
-  return updateStoreInSupabase(storeId, { isOpen });
+  return updateStoreInSupabase(storeId, { 
+    isOpen: Boolean(isOpen), 
+    status: isOpen ? 'open' : 'closed' 
+  });
 }

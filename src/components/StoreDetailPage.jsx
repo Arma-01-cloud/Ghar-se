@@ -36,8 +36,9 @@ export default function StoreDetailPage() {
   const [liveProducts, setLiveProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isFavorite = favoriteStores ? favoriteStores.includes(store.id) : false;
-  const isSelected = currentStore && currentStore.id === store.id;
+  const isFavorite = favoriteStores ? favoriteStores.includes(store?.id) : false;
+  const isSelected = currentStore && currentStore.id === store?.id;
+  const isStoreOpen = store?.isOpen !== false && store?.status !== 'Closed' && store?.status !== 'closed' && store?.is_open !== false;
 
   const handleSelectThisStore = () => {
     setCurrentStore(store);
@@ -159,8 +160,14 @@ export default function StoreDetailPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-2.5 py-0.5 rounded-md">
-                  🟢 {store.status || 'Open'} • Closes {store.closingTime || '10:00 PM'}
+                <span className={`text-xs font-extrabold px-2.5 py-1 rounded-md ${
+                  isStoreOpen 
+                    ? 'bg-emerald-100 text-emerald-800' 
+                    : 'bg-rose-100 text-rose-800'
+                }`}>
+                  {isStoreOpen 
+                    ? `🟢 ${store.status || 'Open'} • Closes ${store.closingTime || '10:00 PM'}` 
+                    : `🔴 Closed • Opens ${store.openingTime || '07:00 AM'}`}
                 </span>
                 <span className="bg-stone-100 text-stone-700 text-xs font-bold px-2.5 py-0.5 rounded-md">
                   📦 {liveProducts.length} Items in Store
@@ -222,6 +229,19 @@ export default function StoreDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* CLOSED STORE ALERT BANNER */}
+      {!isStoreOpen && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 text-amber-950 shadow-xs">
+          <span className="text-2xl mt-0.5">⚠️</span>
+          <div className="space-y-1">
+            <h4 className="font-extrabold text-sm sm:text-base text-amber-950">Store Currently Closed</h4>
+            <p className="text-xs sm:text-sm text-amber-800 font-medium">
+              The shopkeeper has set <strong>{store.name}</strong> as temporarily closed. You can still browse products, but live deliveries will resume when the store opens at {store.openingTime || '07:00 AM'}.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* SEARCH PRODUCTS IN STORE */}
       <div className="space-y-6">

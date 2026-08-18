@@ -5,9 +5,9 @@ import StoreCard from './StoreCard';
 import { Search, Store, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 export default function StoresPage() {
-  const { currentLocation } = useCart();
-  const [stores, setStores] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { currentLocation, availableStores } = useCart();
+  const [stores, setStores] = useState(availableStores || []);
+  const [isLoading, setIsLoading] = useState(!availableStores || availableStores.length === 0);
   const [errorMsg, setErrorMsg] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,8 +42,13 @@ export default function StoresPage() {
   };
 
   useEffect(() => {
-    loadLiveStores();
-  }, [currentLocation]);
+    if (availableStores && availableStores.length > 0) {
+      setStores(availableStores);
+      setIsLoading(false);
+    } else {
+      loadLiveStores();
+    }
+  }, [availableStores, currentLocation]);
 
   const filteredStores = useMemo(() => {
     return stores.filter(store => {

@@ -197,25 +197,90 @@ export const CartProvider = ({ children }) => {
     }
   }, [customerPhone]);
 
-  // Fetch live stores from Supabase when location changes
-  useEffect(() => {
-    async function loadNearbyStores() {
-      const lat = currentLocation?.latitude;
-      const lon = currentLocation?.longitude;
-      const locName = currentLocation?.name || '';
-      const cityName = currentLocation?.city || '';
+  // Fetch live stores from Supabase when location changes or shop status updates
+  const loadNearbyStores = async () => {
+    const lat = currentLocation?.latitude;
+    const lon = currentLocation?.longitude;
+    const locName = currentLocation?.name || '';
+    const cityName = currentLocation?.city || '';
 
-      const res = await fetchStores(lat, lon, locName, cityName);
-      if (res.stores && res.stores.length > 0) {
-        setAvailableStores(res.stores);
-        if (!currentStore || !res.stores.some(s => s.id === currentStore.id)) {
-          setCurrentStoreState(res.stores[0]);
-        }
+    const res = await fetchStores(lat, lon, locName, cityName);
+    if (res.stores && res.stores.length > 0) {
+      setAvailableStores(res.stores);
+      if (!currentStore || !res.stores.some(s => s.id === currentStore.id)) {
+        setCurrentStoreState(res.stores[0]);
       } else {
-        setAvailableStores([]);
+        const updatedCurrent = res.stores.find(s => s.id === currentStore.id);
+        if (updatedCurrent) {
+          setCurrentStoreState(updatedCurrent);
+        }
       }
+    } else {
+      setAvailableStores([]);
     }
+  };
+
+  useEffect(() => {
     loadNearbyStores();
+
+    // Supabase Realtime Subscription for store updates
+    let shopChannel = null;
+    if (isSupabaseConfigured) {
+      shopChannel = supabase
+        .channel('public:shops:customer_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shops' }, () => {
+          loadNearbyStores();
+        })
+        .subscribe();
+    }
+
+    // Immediate custom event listener (same-tab/same-window shop status change)
+    const handleStoreStatusChange = (e) => {
+      const detail = e.detail;
+      if (detail && detail.storeId) {
+        setAvailableStores(prev => prev.map(s => {
+          if (s.id === detail.storeId) {
+            return {
+              ...s,
+              isOpen: detail.isOpen,
+              is_open: detail.isOpen,
+              status: detail.isOpen ? 'Open' : 'Closed'
+            };
+          }
+          return s;
+        }));
+        setCurrentStoreState(prev => {
+          if (prev && prev.id === detail.storeId) {
+            return {
+              ...prev,
+              isOpen: detail.isOpen,
+              is_open: detail.isOpen,
+              status: detail.isOpen ? 'Open' : 'Closed'
+            };
+          }
+          return prev;
+        });
+      }
+      loadNearbyStores();
+    };
+
+    // Cross-tab storage event listener
+    const handleStorageEvent = (e) => {
+      if (e.key === 'gharsee_store_status_update' || e.key === 'gharsee_store_profile') {
+        loadNearbyStores();
+      }
+    };
+
+    window.addEventListener('gharsee_store_status_changed', handleStoreStatusChange);
+    window.addEventListener('storage', handleStorageEvent);
+
+    return () => {
+      if (shopChannel) {
+        supabase.removeChannel(shopChannel);
+      }
+      window.removeEventListener('gharsee_store_status_changed', handleStoreStatusChange);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
   }, [currentLocation]);
 
   // Save location to localStorage and Supabase

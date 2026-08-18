@@ -42,7 +42,11 @@ export default function ShopkeeperDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-3.5 py-1.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-extrabold flex items-center gap-2">
+          <div className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold flex items-center gap-2 border ${
+            storeProfile?.isOpen
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+              : 'bg-rose-50 border-rose-300 text-rose-800'
+          }`}>
             <span className={`w-2.5 h-2.5 rounded-full ${storeProfile?.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
             <span>{storeProfile?.isOpen ? '🟢 STORE OPEN' : '🔴 STORE CLOSED'}</span>
           </div>

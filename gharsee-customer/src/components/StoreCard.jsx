@@ -30,6 +30,8 @@ export default function StoreCard({ store, onSelectStore }) {
     ? store.distance
     : `${store.distanceKm || store.distance || 1.2} km away`;
 
+  const isStoreOpen = store.isOpen !== false && store.status !== 'Closed' && store.status !== 'closed' && store.is_open !== false;
+
   return (
     <div
       onClick={handleShopNow}
@@ -44,13 +46,17 @@ export default function StoreCard({ store, onSelectStore }) {
         <img
           src={store.image || store.image_url || '/images/store_lakshmi.jpg'}
           alt={store.name || 'Local Grocery Store'}
-          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+          className={`w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 ${!isStoreOpen ? 'grayscale-25 opacity-90' : ''}`}
         />
 
         {/* STATUS & RATING OVERLAYS */}
         <div className="absolute top-3 left-3 flex items-center gap-2">
-          <span className="bg-emerald-800/90 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-lg backdrop-blur-xs shadow-xs">
-            🟢 {store.status || 'Open'}
+          <span className={`font-extrabold text-[10px] px-2.5 py-1 rounded-lg backdrop-blur-xs shadow-xs ${
+            isStoreOpen 
+              ? 'bg-emerald-800/90 text-white' 
+              : 'bg-rose-600/95 text-white'
+          }`}>
+            {isStoreOpen ? `🟢 ${store.status || 'Open'}` : '🔴 Closed'}
           </span>
           {isSelected && (
             <span className="bg-amber-400 text-amber-950 font-black text-[10px] px-2.5 py-1 rounded-lg shadow-xs uppercase">
@@ -143,11 +149,18 @@ export default function StoreCard({ store, onSelectStore }) {
           className={`w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 ${
             isSelected
               ? 'bg-emerald-800 text-white shadow-md'
+              : !isStoreOpen
+              ? 'bg-stone-700 hover:bg-stone-800 text-white shadow-xs'
               : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs'
           }`}
         >
           <Store className="w-4 h-4" />
-          <span>{isSelected ? 'SHOPPING HERE' : 'SHOP NOW'}</span>
+          <span>
+            {isSelected 
+              ? (isStoreOpen ? 'SHOPPING HERE' : 'CURRENT STORE (CLOSED)') 
+              : (isStoreOpen ? 'SHOP NOW' : 'VIEW STORE (CLOSED)')
+            }
+          </span>
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
