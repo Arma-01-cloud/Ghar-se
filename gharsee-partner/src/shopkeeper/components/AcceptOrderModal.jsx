@@ -38,16 +38,38 @@ export default function AcceptOrderModal({ order, onClose }) {
           </p>
         </div>
 
-        <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 max-h-36 overflow-y-auto space-y-1 text-xs">
-          {order.items.map((item, idx) => (
-            <div key={idx} className="flex justify-between font-semibold items-center">
-              <span className="text-stone-700">
-                {item.name} <span className="text-stone-500 font-normal text-[11px]">(Quantity: {item.qty || item.quantity || 1}, Weight: {item.unit || '1 unit'})</span>
-              </span>
-              <span className="text-stone-900 font-bold shrink-0 ml-2">₹{(item.price || 0) * (item.qty || item.quantity || 1)}</span>
+        {/* ITEMS PREVIEW OR GROCERY PHOTO */}
+        {order.isDirectImageOrder || order.order_type === 'image' || order.items?.some(i => i.isDirectImageOrder || i.image_url) ? (
+          <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 flex items-start gap-3 text-xs">
+            {(order.image_url || order.items?.[0]?.image_url || order.items?.[0]?.image) && (
+              <img
+                src={order.image_url || order.items?.[0]?.image_url || order.items?.[0]?.image}
+                alt="Grocery List"
+                className="w-14 h-14 object-cover rounded-xl border border-emerald-400 bg-white shrink-0"
+              />
+            )}
+            <div className="space-y-1 flex-1">
+              <span className="font-extrabold text-emerald-950 block">📸 Customer Grocery Image Order</span>
+              <p className="text-[11px] text-stone-600">Quantity: <strong className="text-stone-800">{order.quantity || order.items?.length || 1} image</strong></p>
+              {order.note && (
+                <p className="text-[11px] text-stone-700 bg-white/80 p-1.5 rounded-lg border border-amber-200">
+                  <strong>Note:</strong> {order.note}
+                </p>
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 max-h-36 overflow-y-auto space-y-1 text-xs">
+            {order.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between font-semibold items-center">
+                <span className="text-stone-700">
+                  {item.name} <span className="text-stone-500 font-normal text-[11px]">(Quantity: {item.qty || item.quantity || 1}, Weight: {item.unit || '1 unit'})</span>
+                </span>
+                <span className="text-stone-900 font-bold shrink-0 ml-2">₹{(item.price || 0) * (item.qty || item.quantity || 1)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 pt-2">
           <button

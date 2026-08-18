@@ -54,9 +54,9 @@ export default function Hero() {
               <div className="flex flex-col items-center lg:items-start gap-1">
                 <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-sm">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>AI List OCR</span>
+                  <span>Direct Photo Order</span>
                 </div>
-                <span className="text-[11px] text-emerald-200/70">Photo to Cart</span>
+                <span className="text-[11px] text-emerald-200/70">Photo to Store</span>
               </div>
             </div>
           </div>

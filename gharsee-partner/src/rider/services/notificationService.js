@@ -46,25 +46,50 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
       }
     }
 
-    // 3. Prepare rich notification payload JSONB
+    // 3. Prepare rich notification payload JSONB (Support Grocery Image Orders & Standard Orders)
+    const isImageOrder = Boolean(
+      orderData.order_type === 'image' ||
+      orderData.isDirectImageOrder ||
+      orderData.image_url ||
+      (Array.isArray(orderData.items) && orderData.items.some(i => i && (i.isDirectImageOrder || i.image_url || i.image)))
+    );
+
+    const imageUrl = orderData.image_url ||
+      (Array.isArray(orderData.items) && (orderData.items[0]?.image_url || orderData.items[0]?.image)) ||
+      null;
+
+    const customerNote = (orderData.notes || orderData.note || (Array.isArray(orderData.items) && orderData.items[0]?.note) || '').trim();
+
     const parsedItems = Array.isArray(orderData.items)
       ? orderData.items.map(i => typeof i === 'string' ? { name: i, quantity: 1, unit: '1 unit', price: 0 } : {
           name: i.name || i.product_name || i.itemName,
           quantity: i.quantity || i.qty || 1,
-          unit: i.unit || i.quantityUnit || '1 unit',
+          unit: i.unit || i.quantityUnit || (i.isDirectImageOrder ? 'image order' : '1 unit'),
           price: i.price || 0,
-          isManual: i.isManual || !i.product_id
+          isManual: i.isManual || !i.product_id,
+          isDirectImageOrder: Boolean(i.isDirectImageOrder || i.image_url),
+          image_url: i.image_url || i.image || null,
+          note: i.note || ''
         })
       : [];
 
-    const itemsList = parsedItems.length > 0
-      ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
-      : ['Grocery Items'];
+    const itemsList = isImageOrder
+      ? [`📸 Customer Grocery Photo List (${parsedItems[0]?.quantity || 1} image)`]
+      : (parsedItems.length > 0
+          ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
+          : ['Grocery Items']);
 
     const isAnyStore = orderData.fulfillment_mode === 'shop_any_store' || !orderData.store_id;
 
     const payload = {
       orderId: orderData.id,
+      order_type: isImageOrder ? 'image' : (orderData.order_type || 'standard'),
+      isDirectImageOrder: isImageOrder,
+      isImageOrder: isImageOrder,
+      image_url: imageUrl,
+      image: imageUrl,
+      note: customerNote,
+      notes: customerNote,
       storeName: isAnyStore ? 'Shop From Any Store (Rider Selects Shop)' : storeName,
       storePhone,
       storeAddress,

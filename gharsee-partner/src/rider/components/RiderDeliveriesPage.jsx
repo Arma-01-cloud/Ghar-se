@@ -2,7 +2,7 @@ import React from 'react';
 import { useRider } from '../context/RiderContext';
 import CurrentDeliveryCard from './CurrentDeliveryCard';
 import DeliveryRequestCard from './DeliveryRequestCard';
-import { Bike, ShieldCheck } from 'lucide-react';
+import { Bike, ShieldCheck, Store, MapPin, Package } from 'lucide-react';
 
 export default function RiderDeliveriesPage() {
   const { activeDelivery, incomingRequest, isOnline } = useRider();

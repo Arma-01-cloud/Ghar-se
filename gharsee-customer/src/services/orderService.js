@@ -29,11 +29,16 @@ export function getPartnerAppBaseUrl() {
 
 // Build WhatsApp notification URL & text for Shopkeeper
 export function generateShopkeeperWhatsAppUrl(shopkeeperPhone, order, customerName, customerPhone) {
-  const cleanDigits = get10DigitPhone(shopkeeperPhone) || '8123821300';
+  const cleanDigits = get10DigitPhone(shopkeeperPhone);
+  if (!cleanDigits || cleanDigits.length !== 10) {
+    return {
+      whatsappUrl: '',
+      whatsappMessage: '',
+      targetPhone: '',
+      error: 'This shopkeeper has not registered a WhatsApp number.'
+    };
+  }
   const targetPhone = `91${cleanDigits}`;
-
-  const partnerBase = getPartnerAppBaseUrl();
-  const storeOrderLink = `${partnerBase}/shopkeeper?orderId=${order.id}`;
 
   let itemsFormatted = '';
   if (order.items && order.items.length > 0) {
@@ -50,12 +55,12 @@ export function generateShopkeeperWhatsAppUrl(shopkeeperPhone, order, customerNa
   }
 
   const messageText = 
-`🛒 *New Ghar See Order*
+`🛒 *New GharSee Order*
 
 *Order ID:* #${order.id}
 
-*Customer Name:* ${customerName}
-*Customer Phone:* ${customerPhone}
+*Customer Name:* ${customerName || 'Customer'}
+*Customer Phone:* ${customerPhone || 'Not provided'}
 
 *Order Items:*
 ${itemsFormatted}
@@ -65,15 +70,13 @@ ${order.address || order.deliveryAddress || 'Address not provided'}
 
 *Total Amount:* ₹${order.totalAmount || order.total || 0} (${order.paymentMethod || 'Cash on Delivery'})
 
-Please open the shopkeeper partner portal to view and process the order:
-${storeOrderLink}`;
+Please open your GharSee Partner dashboard to view and process the order.`;
 
   const encodedMessage = encodeURIComponent(messageText);
   return {
     whatsappUrl: `https://wa.me/${targetPhone}?text=${encodedMessage}`,
     whatsappMessage: messageText,
-    targetPhone,
-    storeOrderLink
+    targetPhone
   };
 }
 
@@ -328,6 +331,41 @@ export async function fetchShopkeeperOrders(shopId = null) {
 
     return data.map(o => {
       const phoneNum = o.customer_phone || o.phone || 'Phone not provided';
+      const jsonItems = Array.isArray(o.items) ? o.items : [];
+      const orderImageUrl = o.image_url || jsonItems[0]?.image_url || jsonItems[0]?.image || null;
+      const orderNote = o.notes || jsonItems[0]?.note || null;
+      const isImageOrder = o.order_type === 'image' || jsonItems.some(i => i.isDirectImageOrder || i.image_url) || Boolean(orderImageUrl);
+
+      let resolvedItems = [];
+      if (jsonItems.length > 0) {
+        resolvedItems = jsonItems.map(i => ({
+          id: i.id || i.product_id,
+          name: i.name || i.product_name || (isImageOrder ? 'Grocery Image List' : 'Grocery Item'),
+          quantity: i.quantity || i.qty || 1,
+          qty: i.quantity || i.qty || 1,
+          unit: i.unit || (isImageOrder ? 'image order' : '1 unit'),
+          price: i.price || 0,
+          note: i.note || orderNote || '',
+          image: i.image_url || i.image || orderImageUrl || '/images/cat_veg_fruits.jpg',
+          image_url: i.image_url || i.image || orderImageUrl,
+          image_path: i.image_path || null,
+          isDirectImageOrder: i.isDirectImageOrder || Boolean(i.image_url || orderImageUrl),
+          isManual: i.isManual || !i.product_id,
+          replacementPreference: i.replacementPreference || i.replacement_preference || 'replace_brand'
+        }));
+      } else if (o.order_items && o.order_items.length > 0) {
+        resolvedItems = o.order_items.map(i => ({
+          id: i.product_id || i.id,
+          name: i.product_name,
+          quantity: i.quantity || 1,
+          qty: i.quantity || 1,
+          unit: i.unit || '1 unit',
+          price: i.price || 0,
+          replacementPreference: i.replacement_preference || 'replace_brand',
+          isManual: !i.product_id,
+          image: '/images/cat_veg_fruits.jpg'
+        }));
+      }
 
       return {
         id: o.id,
@@ -343,19 +381,17 @@ export async function fetchShopkeeperOrders(shopId = null) {
         total: o.total_amount || 0,
         status: (o.status || 'pending').toLowerCase(),
         fulfillment_mode: o.fulfillment_mode || 'store_selected',
+        order_type: isImageOrder ? 'image' : (o.order_type || 'standard'),
+        isDirectImageOrder: isImageOrder,
+        image_url: orderImageUrl,
+        imageUrl: orderImageUrl,
+        image_path: o.image_path || (jsonItems[0]?.image_path) || null,
+        note: orderNote,
+        quantity: o.quantity || (jsonItems[0]?.quantity) || 1,
         createdAt: o.created_at || new Date().toISOString(),
-        paymentStatus: o.payment_status || 'Paid',
+        paymentStatus: o.payment_status || (isImageOrder ? 'Pay After Inspection' : 'Pending'),
         deliveryType: o.payment_method || 'Cash on Delivery',
-        items: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
-          id: i.product_id || i.id,
-          name: i.product_name,
-          quantity: i.quantity || 1,
-          qty: i.quantity || 1,
-          unit: i.unit || '1 unit',
-          price: i.price || 0,
-          replacementPreference: i.replacement_preference || 'replace_brand',
-          isManual: !i.product_id
-        })) : (Array.isArray(o.items) ? o.items : [])
+        items: resolvedItems
       };
     });
   } catch {

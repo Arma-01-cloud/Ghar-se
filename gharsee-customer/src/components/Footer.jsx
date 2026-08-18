@@ -65,7 +65,7 @@ export default function Footer() {
             <ul className="space-y-2 text-xs">
               <li><button onClick={() => setActiveTab('home')} className="hover:text-emerald-400 transition-colors">Home Page</button></li>
               <li><button onClick={() => setActiveTab('stores')} className="hover:text-emerald-400 transition-colors">Browse Local Stores</button></li>
-              <li><button onClick={() => setActiveTab('upload')} className="hover:text-emerald-400 transition-colors">Upload Grocery List (OCR)</button></li>
+              <li><button onClick={() => setActiveTab('upload')} className="hover:text-emerald-400 transition-colors">Upload Grocery Image</button></li>
               <li><button onClick={() => setActiveTab('orders')} className="hover:text-emerald-400 transition-colors">Order Tracking</button></li>
               <li><button onClick={() => setActiveTab('cart')} className="hover:text-emerald-400 transition-colors">View Cart</button></li>
             </ul>

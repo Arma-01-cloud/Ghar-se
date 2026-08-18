@@ -274,29 +274,57 @@ export const RiderProvider = ({ children }) => {
             },
             async (payload) => {
               const newOrder = payload.new;
-              // USE CASE 2 ONLY: Only broadcast "Shop From Any Store" orders to riders!
-              const isAnyStoreOrder = newOrder && (newOrder.fulfillment_mode === 'shop_any_store' || !newOrder.store_id);
-              if (isAnyStoreOrder && isOnline && !activeDelivery) {
+              if (!newOrder || !isOnline || activeDelivery) return;
+
+              const isImageOrder = Boolean(
+                newOrder.order_type === 'image' ||
+                newOrder.isDirectImageOrder ||
+                newOrder.image_url ||
+                (Array.isArray(newOrder.items) && newOrder.items.some(i => i && (i.isDirectImageOrder || i.image_url || i.image)))
+              );
+
+              const isAnyStoreOrder = newOrder.fulfillment_mode === 'shop_any_store' || !newOrder.store_id;
+
+              // Broadcast real-time notifications for Grocery Image Orders & Any-Store Orders
+              if (isImageOrder || isAnyStoreOrder) {
+                const imageUrl = newOrder.image_url ||
+                  (Array.isArray(newOrder.items) && (newOrder.items[0]?.image_url || newOrder.items[0]?.image)) ||
+                  null;
+
+                const customerNote = (newOrder.notes || newOrder.note || (Array.isArray(newOrder.items) && newOrder.items[0]?.note) || '').trim();
+
                 const parsedItems = Array.isArray(newOrder.items)
                   ? newOrder.items.map(i => typeof i === 'string' ? { name: i, quantity: 1, unit: '1 unit', price: 0 } : {
                       name: i.name || i.product_name || i.itemName,
                       quantity: i.quantity || i.qty || 1,
-                      unit: i.unit || i.quantityUnit || '1 unit',
+                      unit: i.unit || i.quantityUnit || (i.isDirectImageOrder ? 'image order' : '1 unit'),
                       price: i.price || 0,
-                      isManual: i.isManual || !i.product_id
+                      isManual: i.isManual || !i.product_id,
+                      isDirectImageOrder: Boolean(i.isDirectImageOrder || i.image_url),
+                      image_url: i.image_url || i.image || null,
+                      note: i.note || ''
                     })
                   : [];
 
-                const itemsList = parsedItems.length > 0
-                  ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
-                  : ['Grocery Items'];
+                const itemsList = isImageOrder
+                  ? [`📸 Customer Grocery Photo List (${parsedItems[0]?.quantity || 1} image)`]
+                  : (parsedItems.length > 0
+                      ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
+                      : ['Grocery Items']);
 
                 const notifObj = {
                   id: `order-notif-${newOrder.id}`,
                   order_id: newOrder.id,
                   payload: {
                     orderId: newOrder.id,
-                    storeName: 'Shop From Any Store (Rider Choice)',
+                    order_type: isImageOrder ? 'image' : (newOrder.order_type || 'standard'),
+                    isDirectImageOrder: isImageOrder,
+                    isImageOrder: isImageOrder,
+                    image_url: imageUrl,
+                    image: imageUrl,
+                    note: customerNote,
+                    notes: customerNote,
+                    storeName: isAnyStoreOrder ? 'Shop From Any Store (Rider Choice)' : (newOrder.store_name || 'Local Grocery Store'),
                     storePhone: '+91 81238 21300',
                     storeAddress: 'Market Road, Chikkamagaluru',
                     customerName: newOrder.customer_name || 'Customer',
@@ -305,11 +333,11 @@ export const RiderProvider = ({ children }) => {
                     itemCount: itemsList.length,
                     items: itemsList,
                     parsedItems: parsedItems,
-                    fulfillment_mode: 'shop_any_store',
-                    isAnyStore: true,
+                    fulfillment_mode: isAnyStoreOrder ? 'shop_any_store' : 'store_selected',
+                    isAnyStore: isAnyStoreOrder,
                     totalAmount: newOrder.total_amount || 0,
                     paymentStatus: newOrder.payment_method || 'Cash on Delivery',
-                    estimatedEarnings: 85,
+                    estimatedEarnings: isAnyStoreOrder ? 85 : 65,
                     distance: '1.8 km',
                     estimatedTime: 'Delivery after 4:00 PM'
                   }

@@ -71,6 +71,17 @@ export default function RiderDeliveriesPage() {
                 ? order.parsedItems 
                 : (Array.isArray(order.items) ? order.items : []);
 
+              const isImgOrder = Boolean(
+                order.isDirectImageOrder || 
+                order.isImageOrder ||
+                order.order_type === 'image' || 
+                order.image_url || 
+                rawItems.some(i => i && (i.isDirectImageOrder || i.image_url || i.image))
+              );
+
+              const orderImg = order.image_url || order.image || rawItems[0]?.image_url || rawItems[0]?.image;
+              const orderNote = order.note || order.notes || rawItems[0]?.note;
+
               return (
                 <div 
                   key={order.id} 
@@ -78,10 +89,15 @@ export default function RiderDeliveriesPage() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
                           ORDER #{order.id}
                         </span>
+                        {isImgOrder && (
+                          <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                            📸 Photo Order
+                          </span>
+                        )}
                         <span className="text-[10px] font-bold text-stone-500">
                           {order.paymentStatus || 'Cash on Delivery'}
                         </span>
@@ -118,20 +134,42 @@ export default function RiderDeliveriesPage() {
                     </div>
                   </div>
 
-                  {/* ITEMS PREVIEW WITH GRAMS / LITERS */}
-                  {rawItems.length > 0 && (
-                    <div className="bg-stone-50/90 rounded-2xl p-3 border border-stone-200 space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase text-stone-500 block flex items-center gap-1">
-                        <Package className="w-3.5 h-3.5 text-emerald-700" /> Items in order ({rawItems.length}):
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {rawItems.map((it, idx) => (
-                          <span key={idx} className="bg-white border border-stone-200 px-2.5 py-1 rounded-xl text-[11px] font-bold text-stone-800 shadow-2xs">
-                            {typeof it === 'string' ? it : `${it.name || it.product_name} (Quantity: ${it.quantity || 1}, Weight: ${it.unit || '1 unit'})`}
-                          </span>
-                        ))}
+                  {/* IMAGE ORDER PREVIEW OR STANDARD ITEMS */}
+                  {isImgOrder ? (
+                    <div className="bg-emerald-50/70 rounded-2xl p-3 border border-emerald-200 flex items-start gap-3 text-xs">
+                      {orderImg && (
+                        <img
+                          src={orderImg}
+                          alt="Grocery Photo"
+                          className="w-14 h-14 object-cover rounded-xl border border-emerald-400 bg-white shrink-0"
+                        />
+                      )}
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <span className="font-extrabold text-emerald-950 block">
+                          📸 Customer Grocery Photo Order
+                        </span>
+                        {orderNote && (
+                          <p className="text-[11px] text-stone-700 bg-white/80 p-1.5 rounded-lg border border-amber-200">
+                            <strong>Note:</strong> {orderNote}
+                          </p>
+                        )}
                       </div>
                     </div>
+                  ) : (
+                    rawItems.length > 0 && (
+                      <div className="bg-stone-50/90 rounded-2xl p-3 border border-stone-200 space-y-2">
+                        <span className="text-[10px] font-extrabold uppercase text-stone-500 block flex items-center gap-1">
+                          <Package className="w-3.5 h-3.5 text-emerald-700" /> Items in order ({rawItems.length}):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {rawItems.map((it, idx) => (
+                            <span key={idx} className="bg-white border border-stone-200 px-2.5 py-1 rounded-xl text-[11px] font-bold text-stone-800 shadow-2xs">
+                              {typeof it === 'string' ? it : `${it.name || it.product_name} (Quantity: ${it.quantity || 1}, Weight: ${it.unit || '1 unit'})`}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
                   )}
 
                   {/* 1-CLICK ACCEPT BUTTON */}

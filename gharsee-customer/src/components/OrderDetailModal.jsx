@@ -97,15 +97,43 @@ export default function OrderDetailModal({ order, onClose }) {
           <h4 className="text-xs font-extrabold uppercase tracking-wider text-stone-600">Grocery Items ({order.items?.length || 0})</h4>
           <div className="divide-y divide-stone-100 border border-stone-200 rounded-2xl p-3 bg-white space-y-2">
             {order.items?.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between pt-2 first:pt-0">
+              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 first:pt-0">
                 <div className="flex items-center gap-3">
-                  <img src={item.image || '/images/cat_veg_fruits.jpg'} alt="" className="w-10 h-10 object-cover rounded-xl bg-stone-100" />
+                  <img
+                    src={item.image_url || item.image || '/images/cat_veg_fruits.jpg'}
+                    alt=""
+                    className="w-12 h-12 object-cover rounded-xl bg-stone-100 border border-stone-200"
+                  />
                   <div>
-                    <h5 className="font-extrabold text-xs text-stone-900">{item.name}</h5>
-                    <p className="text-[11px] text-stone-500">Quantity: <strong className="text-stone-700 font-bold">{item.quantity || item.qty || 1}</strong> • Weight: <strong className="text-stone-700 font-bold">{item.unit || '1 unit'}</strong></p>
+                    <div className="flex items-center gap-2">
+                      <h5 className="font-extrabold text-xs text-stone-900">{item.name}</h5>
+                      {(item.isDirectImageOrder || item.image_url) && (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          📸 Photo Order
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-500">
+                      Quantity: <strong className="text-stone-700 font-bold">{item.quantity || item.qty || 1}</strong> • Weight: <strong className="text-stone-700 font-bold">{item.unit || '1 unit'}</strong>
+                    </p>
+                    {item.note && (
+                      <p className="text-[11px] text-stone-600 font-medium italic">Note: "{item.note}"</p>
+                    )}
+                    {item.image_url && (
+                      <a
+                        href={item.image_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-bold text-emerald-700 hover:underline inline-block mt-0.5"
+                      >
+                        🔍 View Full Image
+                      </a>
+                    )}
                   </div>
                 </div>
-                <span className="font-extrabold text-sm text-stone-900">₹{(item.price || 0) * (item.quantity || item.qty || 1)}</span>
+                <span className="font-extrabold text-sm text-stone-900">
+                  {item.price ? `₹${item.price * (item.quantity || item.qty || 1)}` : 'Pay After Inspection'}
+                </span>
               </div>
             ))}
           </div>

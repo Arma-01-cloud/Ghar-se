@@ -257,14 +257,104 @@ export const RiderProvider = ({ children }) => {
           setIncomingNotification((prev) => (prev?.id === notifRecord.id ? null : prev));
         }
       });
+
+      // 3. Direct Supabase Realtime Listener on orders table INSERT event
+      if (isSupabaseConfigured) {
+        ordersChannel = supabase
+          .channel('rider-global-orders-live')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'orders'
+            },
+            async (payload) => {
+              const newOrder = payload.new;
+              if (!newOrder || !isOnline || activeDelivery) return;
+
+              const isImageOrder = Boolean(
+                newOrder.order_type === 'image' ||
+                newOrder.isDirectImageOrder ||
+                newOrder.image_url ||
+                (Array.isArray(newOrder.items) && newOrder.items.some(i => i && (i.isDirectImageOrder || i.image_url || i.image)))
+              );
+
+              const isAnyStoreOrder = newOrder.fulfillment_mode === 'shop_any_store' || !newOrder.store_id;
+
+              // Broadcast real-time notifications for Grocery Image Orders & Any-Store Orders
+              if (isImageOrder || isAnyStoreOrder) {
+                const imageUrl = newOrder.image_url ||
+                  (Array.isArray(newOrder.items) && (newOrder.items[0]?.image_url || newOrder.items[0]?.image)) ||
+                  null;
+
+                const customerNote = (newOrder.notes || newOrder.note || (Array.isArray(newOrder.items) && newOrder.items[0]?.note) || '').trim();
+
+                const parsedItems = Array.isArray(newOrder.items)
+                  ? newOrder.items.map(i => typeof i === 'string' ? { name: i, quantity: 1, unit: '1 unit', price: 0 } : {
+                      name: i.name || i.product_name || i.itemName,
+                      quantity: i.quantity || i.qty || 1,
+                      unit: i.unit || i.quantityUnit || (i.isDirectImageOrder ? 'image order' : '1 unit'),
+                      price: i.price || 0,
+                      isManual: i.isManual || !i.product_id,
+                      isDirectImageOrder: Boolean(i.isDirectImageOrder || i.image_url),
+                      image_url: i.image_url || i.image || null,
+                      note: i.note || ''
+                    })
+                  : [];
+
+                const itemsList = isImageOrder
+                  ? [`📸 Customer Grocery Photo List (${parsedItems[0]?.quantity || 1} image)`]
+                  : (parsedItems.length > 0
+                      ? parsedItems.map(i => `${i.name} (Quantity: ${i.quantity}, Weight: ${i.unit})`)
+                      : ['Grocery Items']);
+
+                const notifObj = {
+                  id: `order-notif-${newOrder.id}`,
+                  order_id: newOrder.id,
+                  payload: {
+                    orderId: newOrder.id,
+                    order_type: isImageOrder ? 'image' : (newOrder.order_type || 'standard'),
+                    isDirectImageOrder: isImageOrder,
+                    isImageOrder: isImageOrder,
+                    image_url: imageUrl,
+                    image: imageUrl,
+                    note: customerNote,
+                    notes: customerNote,
+                    storeName: isAnyStoreOrder ? 'Shop From Any Store (Rider Choice)' : (newOrder.store_name || 'Local Grocery Store'),
+                    storePhone: '+91 81238 21300',
+                    storeAddress: 'Market Road, Chikkamagaluru',
+                    customerName: newOrder.customer_name || 'Customer',
+                    customerPhone: newOrder.customer_phone || 'Phone not provided',
+                    deliveryAddress: newOrder.delivery_address || 'Chikkamagaluru, Karnataka',
+                    itemCount: itemsList.length,
+                    items: itemsList,
+                    parsedItems: parsedItems,
+                    fulfillment_mode: isAnyStoreOrder ? 'shop_any_store' : 'store_selected',
+                    isAnyStore: isAnyStoreOrder,
+                    totalAmount: newOrder.total_amount || 0,
+                    paymentStatus: newOrder.payment_method || 'Cash on Delivery',
+                    estimatedEarnings: isAnyStoreOrder ? 85 : 65,
+                    distance: '1.8 km',
+                    estimatedTime: 'Delivery after 4:00 PM'
+                  }
+                };
+
+                setIncomingNotification(notifObj);
+                playIncomingPing();
+              }
+            }
+          )
+          .subscribe();
+      }
     }
 
+    let ordersChannel = null;
     initRiderNotifications();
 
     return () => {
-      if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
-      }
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      if (ordersChannel) supabase.removeChannel(ordersChannel);
     };
   }, [isLoggedIn, isOnline, profile?.id, !!activeDelivery]);
 

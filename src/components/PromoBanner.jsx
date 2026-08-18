@@ -22,11 +22,11 @@ export default function PromoBanner() {
 
             <h2 className="font-display text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white">
               Got a Handwritten Grocery List?<br />
-              <span className="text-emerald-300">Turn it into a cart in 3 seconds.</span>
+              <span className="text-emerald-300">Send photo directly to your local store.</span>
             </h2>
 
             <p className="text-emerald-100/90 text-xs sm:text-sm max-w-xl leading-relaxed">
-              No need to search for items individually! Take a photo of your paper list or WhatsApp text note and let our smart parser match your exact items to local darkstore stocks.
+              No need to search for items individually! Take a photo of your handwritten grocery list or items, and we'll send it directly to your trusted local shopkeeper for instant fulfillment.
             </p>
 
             <div className="pt-2">
@@ -35,7 +35,7 @@ export default function PromoBanner() {
                 className="py-3.5 px-7 bg-white text-emerald-950 font-extrabold text-sm rounded-2xl shadow-xl hover:bg-emerald-50 transition-all flex items-center gap-2"
               >
                 <Camera className="w-4 h-4 text-emerald-700" />
-                <span>TRY GROCERY LIST OCR NOW</span>
+                <span>ORDER BY GROCERY PHOTO</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

@@ -128,53 +128,93 @@ export default function ShopkeeperDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pendingOrders.map(order => (
-              <div key={order.id} className="bg-amber-50/60 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-xs">
-                
-                <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
-                  <div>
-                    <span className="font-display font-black text-base text-amber-950 block">ORDER #{order.id}</span>
-                    <span className="text-[11px] text-stone-500 font-semibold">Customer: {order.customerName}</span>
+            {pendingOrders.map(order => {
+              const isImageOrder = order.isDirectImageOrder || order.order_type === 'image' || order.items?.some(i => i.isDirectImageOrder || i.image_url);
+              const imageUrl = order.image_url || order.items?.find(i => i.image_url)?.image_url || order.items?.[0]?.image;
+
+              return (
+                <div key={order.id} className="bg-amber-50/60 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-xs">
+                  
+                  <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-display font-black text-base text-amber-950">ORDER #{order.id}</span>
+                        {isImageOrder && (
+                          <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold text-[10px] px-2 py-0.5 rounded-md">
+                            📸 Photo Order
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-stone-500 font-semibold block mt-0.5">
+                        Customer: <strong className="text-stone-800">{order.customerName}</strong> • {order.customerPhone || order.phone}
+                      </span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-black text-lg text-emerald-950">
+                        {order.total > 0 ? `₹${order.total}` : 'Pay on Delivery'}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 font-bold block">{order.paymentStatus}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-black text-lg text-emerald-950">₹{order.total}</span>
-                    <span className="text-[10px] text-emerald-700 font-bold block">{order.paymentStatus}</span>
+
+                  {isImageOrder ? (
+                    <div className="flex items-start gap-3 bg-white p-3 rounded-xl border border-amber-200">
+                      {imageUrl && (
+                        <img
+                          src={imageUrl}
+                          alt="Grocery Photo"
+                          className="w-14 h-14 object-cover rounded-lg border border-stone-200 bg-stone-100 shrink-0"
+                        />
+                      )}
+                      <div className="space-y-1 text-xs text-stone-700 flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 font-extrabold text-emerald-900">
+                          <span>📸 Customer Grocery Photo</span>
+                          <span className="text-stone-500 font-normal">({order.quantity || order.items?.length || 1} image)</span>
+                        </div>
+                        {order.note && (
+                          <p className="text-[11px] text-stone-600 bg-amber-50 p-1.5 rounded-md border border-amber-200 line-clamp-2">
+                            <strong>Note:</strong> {order.note}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-stone-400 truncate">📍 {order.deliveryAddress}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-xs text-stone-700">
+                      <p className="font-semibold">📦 <strong>{order.items.length} Items:</strong> {order.items.map(i => i.name).join(', ')}</p>
+                      <p className="text-stone-500">📍 {order.deliveryAddress}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-amber-200/60">
+                    <button
+                      onClick={() => {
+                        setSelectedOrderId(order.id);
+                        setActiveShopkeeperTab('order-detail');
+                      }}
+                      className="py-2.5 px-3 bg-white hover:bg-stone-100 text-stone-800 font-extrabold text-xs rounded-xl border border-stone-300 flex items-center justify-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> {isImageOrder ? 'View Photo' : 'View'}
+                    </button>
+
+                    <button
+                      onClick={() => setRejectingOrder(order)}
+                      className="py-2.5 px-3 bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1"
+                    >
+                      <AlertOctagon className="w-3.5 h-3.5" /> Reject
+                    </button>
+
+                    <button
+                      onClick={() => setAcceptingOrder(order)}
+                      className="py-2.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-1"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Accept
+                    </button>
                   </div>
+
                 </div>
-
-                <div className="space-y-1 text-xs text-stone-700">
-                  <p className="font-semibold">📦 <strong>{order.items.length} Items:</strong> {order.items.map(i => i.name).join(', ')}</p>
-                  <p className="text-stone-500">📍 {order.deliveryAddress}</p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-amber-200/60">
-                  <button
-                    onClick={() => {
-                      setSelectedOrderId(order.id);
-                      setActiveShopkeeperTab('order-detail');
-                    }}
-                    className="py-2.5 px-3 bg-white hover:bg-stone-100 text-stone-800 font-extrabold text-xs rounded-xl border border-stone-300 flex items-center justify-center gap-1"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> View
-                  </button>
-
-                  <button
-                    onClick={() => setRejectingOrder(order)}
-                    className="py-2.5 px-3 bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1"
-                  >
-                    <AlertOctagon className="w-3.5 h-3.5" /> Reject
-                  </button>
-
-                  <button
-                    onClick={() => setAcceptingOrder(order)}
-                    className="py-2.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-1"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Accept
-                  </button>
-                </div>
-
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

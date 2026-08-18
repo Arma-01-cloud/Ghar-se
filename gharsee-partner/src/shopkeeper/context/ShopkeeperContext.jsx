@@ -239,11 +239,24 @@ export const ShopkeeperProvider = ({ children }) => {
       loadLiveProducts();
     }
 
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && storeProfile?.id) {
       const orderChannel = supabase
-        .channel('public:orders:shopkeeper')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-          loadLiveOrders();
+        .channel(`public:orders:shopkeeper:${storeProfile.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+          // If order belongs to this shop, reload orders and alert shopkeeper
+          const incomingStoreId = payload.new?.store_id || payload.old?.store_id;
+          if (!incomingStoreId || incomingStoreId === storeProfile.id) {
+            loadLiveOrders();
+            if (payload.eventType === 'INSERT') {
+              const isImg = payload.new?.order_type === 'image' || payload.new?.image_url;
+              addShopkeeperToast(
+                isImg 
+                  ? `📸 New Grocery Image Order #${payload.new?.id || ''} Received!`
+                  : `🔔 New Order #${payload.new?.id || ''} Received!`, 
+                'success'
+              );
+            }
+          }
         })
         .subscribe();
 

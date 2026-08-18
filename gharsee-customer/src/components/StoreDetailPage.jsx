@@ -13,6 +13,7 @@ export default function StoreDetailPage() {
   const { 
     selectedStoreId, 
     setSelectedStoreId,
+    availableStores,
     currentStore, 
     setCurrentStore, 
     favoriteStores, 
@@ -21,8 +22,12 @@ export default function StoreDetailPage() {
   } = useCart();
 
   const store = useMemo(() => {
-    return STORES.find(s => s.id === selectedStoreId) || currentStore || STORES[0];
-  }, [selectedStoreId, currentStore]);
+    return (availableStores || []).find(s => s.id === selectedStoreId) || 
+      STORES.find(s => s.id === selectedStoreId) || 
+      currentStore || 
+      (availableStores && availableStores[0]) || 
+      STORES[0];
+  }, [availableStores, selectedStoreId, currentStore]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');

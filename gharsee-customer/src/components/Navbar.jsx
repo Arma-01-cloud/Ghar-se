@@ -21,7 +21,7 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
     { id: 'home', label: 'Home', icon: Home },
     { id: 'stores', label: 'Stores', icon: Store, badge: 'Nearby' },
     { id: 'any-store', label: 'Shop Any Store', icon: Sparkles, badge: 'Express' },
-    { id: 'upload', label: 'Upload List', icon: Upload, badge: 'AI OCR' },
+    { id: 'upload', label: 'Upload Image', icon: Upload, badge: 'Photo' },
     { id: 'orders', label: 'My Orders', icon: Clock }
   ];
 

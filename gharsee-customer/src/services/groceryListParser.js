@@ -1,5 +1,8 @@
 import { MOCK_PRODUCTS } from './mock/customerService';
 
+/**
+ * Fuzzy search matches item name against catalog products for manual entry form
+ */
 export function matchItemToCatalog(itemName) {
   if (!itemName) return null;
   const nameLower = itemName.toLowerCase();
@@ -17,6 +20,9 @@ export function matchItemToCatalog(itemName) {
   };
 }
 
+/**
+ * Text parsing helper for manual list text entry
+ */
 export async function parseRawListText(rawText) {
   if (!rawText) return [];
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
@@ -27,8 +33,4 @@ export async function parseRawListText(rawText) {
     unit: '1 item',
     matchedProduct: matchItemToCatalog(line)
   }));
-}
-
-export async function parseGroceryListImage(imageFile) {
-  return parseRawListText('1 kg Basmati Rice\n500ml Milk\n1 Litre Cooking Oil');
 }

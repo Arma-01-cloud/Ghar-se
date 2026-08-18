@@ -10,26 +10,8 @@ export default function GroceryListSection() {
   const { addMultipleToCart, setActiveTab } = useCart();
   const [activeInputMethod, setActiveInputMethod] = useState('manual'); // 'manual' or 'upload'
 
-  // Unified Grocery List items state (Defaults to empty list - no fake mock items)
+  // Unified Grocery List items state for manual entry
   const [items, setItems] = useState([]);
-
-  // Handle OCR extracted items append
-  const handleItemsExtracted = (newExtractedItems) => {
-    const formatted = newExtractedItems.map((item, idx) => ({
-      id: `ocr-${Date.now()}-${idx}`,
-      name: item.name,
-      itemName: item.name,
-      brand: item.brand || '',
-      quantity: item.qty || 1,
-      qty: item.qty || 1,
-      unit: item.unit || 'kg',
-      description: item.description || '',
-      selectedProduct: item.selectedProduct || matchItemToCatalog(item.name)[0] || null,
-      selected: true
-    }));
-
-    setItems(prev => [...formatted, ...prev]);
-  };
 
   // Handle manual item add
   const handleAddManualItem = (newItem) => {
@@ -110,7 +92,7 @@ export default function GroceryListSection() {
           }`}
         >
           <Camera className="w-4 h-4 text-emerald-400" />
-          <span>Upload List Photo</span>
+          <span>Upload Grocery Photo</span>
         </button>
       </div>
 
@@ -120,19 +102,21 @@ export default function GroceryListSection() {
           <ManualGroceryFormCard onAddItem={handleAddManualItem} />
         ) : (
           <div className="w-full max-w-2xl">
-            <UploadGroceryListCard onItemsExtracted={handleItemsExtracted} />
+            <UploadGroceryListCard />
           </div>
         )}
       </div>
 
-      {/* UNIFIED GROCERY LIST DISPLAY BELOW FORM */}
-      <GroceryListItems
-        items={items}
-        onUpdateItem={handleUpdateItem}
-        onDeleteItem={handleDeleteItem}
-        onClearList={handleClearList}
-        onAddAllToCart={handleAddAllToCart}
-      />
+      {/* UNIFIED GROCERY LIST DISPLAY BELOW MANUAL FORM */}
+      {items.length > 0 && activeInputMethod === 'manual' && (
+        <GroceryListItems
+          items={items}
+          onUpdateItem={handleUpdateItem}
+          onDeleteItem={handleDeleteItem}
+          onClearList={handleClearList}
+          onAddAllToCart={handleAddAllToCart}
+        />
+      )}
 
     </section>
   );

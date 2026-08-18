@@ -47,13 +47,25 @@ export default function DeliveryRequestCard({ request }) {
       {/* ORDER & EARNINGS HIGHLIGHT */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="font-display font-black text-2xl text-white">ORDER #{request.id}</span>
-          <p className="text-xs text-emerald-200/80 font-medium">{request.itemCount} Items • {request.paymentStatus}</p>
+          <div className="flex items-center gap-2">
+            <span className="font-display font-black text-2xl text-white">ORDER #{request.id}</span>
+            {(request.isDirectImageOrder || request.order_type === 'image' || request.image_url) && (
+              <span className="text-[10px] font-black uppercase text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-400/30">
+                📸 Photo Order
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-emerald-200/80 font-medium">{request.itemCount || 1} Items • {request.paymentStatus || 'Cash on Delivery'}</p>
+          {request.note && (
+            <p className="text-[11px] text-amber-200 mt-1 bg-emerald-950/80 p-1.5 rounded-lg border border-emerald-700/60 truncate">
+              <strong>Note:</strong> {request.note}
+            </p>
+          )}
         </div>
 
-        <div className="text-right bg-emerald-950/60 px-4 py-2 rounded-2xl border border-emerald-700/50">
+        <div className="text-right bg-emerald-950/60 px-4 py-2 rounded-2xl border border-emerald-700/50 shrink-0">
           <span className="text-[10px] text-emerald-300 font-extrabold uppercase block">Est. Earnings</span>
-          <span className="font-display font-black text-2xl text-emerald-400">₹{request.estimatedEarnings}</span>
+          <span className="font-display font-black text-2xl text-emerald-400">₹{request.estimatedEarnings || 65}</span>
         </div>
       </div>
 

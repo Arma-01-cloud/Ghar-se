@@ -227,17 +227,46 @@ export default function ShopkeeperOrdersPage() {
                     </div>
                   </div>
 
-                  <div className="sm:col-span-5">
-                    <span className="text-[10px] text-stone-400 font-bold uppercase block">Order Contents ({order.items.length} items)</span>
-                    <p className="font-semibold text-stone-800 line-clamp-1">
-                      {order.items.map(i => `${i.name} (Quantity: ${i.qty || i.quantity || 1}, Weight: ${i.unit || '1 unit'})`).join(', ')}
-                    </p>
-                    <p className="text-[11px] text-stone-400 truncate">{order.deliveryAddress}</p>
-                  </div>
+                  {/* ORDER CONTENTS OR GROCERY IMAGE DETAILS */}
+                  {order.isDirectImageOrder || order.order_type === 'image' || order.items?.some(i => i.isDirectImageOrder || i.image_url) ? (
+                    <div className="sm:col-span-5 flex items-start gap-3">
+                      {(order.image_url || order.items?.[0]?.image_url || order.items?.[0]?.image) && (
+                        <img
+                          src={order.image_url || order.items?.[0]?.image_url || order.items?.[0]?.image}
+                          alt="Grocery Photo"
+                          className="w-14 h-14 object-cover rounded-xl border-2 border-emerald-500 bg-stone-100 shrink-0"
+                        />
+                      )}
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold text-[10px] px-2 py-0.5 rounded-md">
+                            📸 Grocery Image Order
+                          </span>
+                          <span className="text-[11px] text-stone-500 font-bold">Qty: {order.quantity || 1}</span>
+                        </div>
+                        {order.note && (
+                          <p className="text-[11px] text-stone-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md line-clamp-1 mt-1">
+                            <strong>Note:</strong> {order.note}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-stone-400 truncate mt-0.5">📍 {order.deliveryAddress}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="sm:col-span-5">
+                      <span className="text-[10px] text-stone-400 font-bold uppercase block">Order Contents ({order.items.length} items)</span>
+                      <p className="font-semibold text-stone-800 line-clamp-1">
+                        {order.items.map(i => `${i.name} (Quantity: ${i.qty || i.quantity || 1}, Weight: ${i.unit || '1 unit'})`).join(', ')}
+                      </p>
+                      <p className="text-[11px] text-stone-400 truncate">{order.deliveryAddress}</p>
+                    </div>
+                  )}
 
                   <div className="sm:col-span-3 text-right">
                     <span className="text-[10px] text-stone-400 font-bold uppercase block">Total Amount</span>
-                    <span className="font-black text-xl text-emerald-950">₹{order.total}</span>
+                    <span className="font-black text-xl text-emerald-950">
+                      {order.total > 0 ? `₹${order.total}` : 'Pay on Delivery'}
+                    </span>
                     <span className="text-[10px] font-bold text-emerald-700 block">{order.paymentStatus}</span>
                   </div>
                 </div>
