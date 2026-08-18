@@ -125,7 +125,21 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
             {/* SPACER FOR MOBILE */}
             <div className="flex-1 sm:hidden" />
 
-            {/* 5. ALWAYS VISIBLE CART BUTTON (SHRINK-0) */}
+            {/* 5. ORDERS BUTTON */}
+            <button 
+              onClick={() => setActiveTab('orders')} 
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
+                activeTab === 'orders'
+                  ? 'bg-[#08241B] text-white border-emerald-500 ring-2 ring-emerald-400'
+                  : 'bg-stone-100 hover:bg-stone-200/80 text-stone-800 border-stone-300'
+              }`}
+              title="View order history"
+            >
+              <Clock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+              <span className="truncate max-w-[80px] hidden xs:inline">{customerPhone ? customerPhone.slice(-10) : 'Orders'}</span>
+            </button>
+
+            {/* 6. ALWAYS VISIBLE CART BUTTON (SHRINK-0) */}
             <button
               onClick={() => setActiveTab('cart')}
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full font-black text-xs transition-all shadow-md shrink-0 cursor-pointer ${
@@ -147,16 +161,6 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
                 <span className="text-[9px] text-emerald-300 uppercase tracking-widest font-extrabold">Cart</span>
                 <span className="text-xs font-black whitespace-nowrap">₹{cartSubtotal}</span>
               </div>
-            </button>
-
-            {/* 6. USER ACCOUNT / ORDERS BADGE */}
-            <button 
-              onClick={() => setActiveTab('orders')} 
-              className="hidden xl:flex items-center gap-1.5 px-3 py-2 rounded-full bg-stone-100 hover:bg-stone-200/80 text-stone-800 border border-stone-300 text-xs font-extrabold transition-all shrink-0 cursor-pointer"
-              title="View order history"
-            >
-              <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span className="truncate max-w-[80px]">{customerPhone ? customerPhone.slice(-10) : 'Orders'}</span>
             </button>
 
             {/* 7. MOBILE MENU TOGGLE BUTTON */}

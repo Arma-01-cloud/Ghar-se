@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
-import { ShoppingBag, Upload, ShieldCheck, Zap, Sparkles, ArrowRight, Store, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, Zap, Sparkles, ArrowRight, Store, CheckCircle2, PhoneCall } from 'lucide-react';
 
 export default function Hero() {
   const { setActiveTab } = useCart();
@@ -33,6 +33,27 @@ export default function Hero() {
             <p className="text-emerald-100/90 text-sm sm:text-base lg:text-lg max-w-2xl font-normal leading-relaxed mx-auto lg:mx-0">
               Order fresh essentials directly from a specific local store or shop from any store in your area with express local fulfillment.
             </p>
+
+            {/* CALL TO ORDER ACTION BUTTONS */}
+            <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3">
+              <a
+                href="tel:8123821300"
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-stone-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-400/25 transition-all group"
+              >
+                <div className="w-7 h-7 rounded-xl bg-stone-950/10 flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <PhoneCall className="w-4 h-4 text-stone-950 stroke-[2.5]" />
+                </div>
+                <span>Call to Order</span>
+              </a>
+
+              <button
+                onClick={() => setActiveTab('stores')}
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-emerald-800/80 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm border border-emerald-600/60 shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                <Store className="w-4 h-4 text-emerald-300" />
+                <span>Browse Stores</span>
+              </button>
+            </div>
 
             <div className="pt-4 grid grid-cols-3 gap-3 border-t border-emerald-800/60 max-w-xl mx-auto lg:mx-0 text-center lg:text-left">
               <div className="flex flex-col items-center lg:items-start gap-1">
@@ -100,11 +121,11 @@ export default function Hero() {
               How would you like to shop today?
             </h2>
             <p className="text-stone-500 text-xs sm:text-sm font-medium">
-              Choose between browsing a specific local store or finding products from any store in your area.
+              Choose between browsing a specific local store, finding products from any store, or calling us directly to order.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             
             {/* CARD 1: CHOOSE A SPECIFIC STORE */}
             <div 
@@ -130,7 +151,7 @@ export default function Hero() {
                   e.stopPropagation();
                   setActiveTab('stores');
                 }}
-                className="w-full py-4 px-6 bg-stone-900 group-hover:bg-emerald-800 text-white font-extrabold text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md transition-all"
+                className="w-full py-4 px-6 bg-stone-900 group-hover:bg-emerald-800 text-white font-extrabold text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
               >
                 <span>Browse Stores</span>
                 <ArrowRight className="w-4 h-4 stroke-[3] group-hover:translate-x-1 transition-transform" />
@@ -167,12 +188,46 @@ export default function Hero() {
                   e.stopPropagation();
                   setActiveTab('any-store');
                 }}
-                className="w-full py-4 px-6 bg-emerald-500 group-hover:bg-emerald-400 text-emerald-950 font-extrabold text-sm rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/40 transition-all"
+                className="w-full py-4 px-6 bg-emerald-500 group-hover:bg-emerald-400 text-emerald-950 font-extrabold text-sm rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/40 transition-all cursor-pointer"
               >
                 <span>Shop Now</span>
                 <ArrowRight className="w-4 h-4 stroke-[3] group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
+
+            {/* CARD 3: CALL TO ORDER */}
+            <a 
+              href="tel:8123821300"
+              className="bg-amber-50 hover:bg-amber-100/70 rounded-3xl p-6 sm:p-8 border-2 border-amber-200 hover:border-amber-400 transition-all duration-300 cursor-pointer shadow-xs hover:shadow-xl group flex flex-col justify-between space-y-6"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-400 text-stone-950 group-hover:bg-amber-500 flex items-center justify-center font-bold shadow-md transition-colors">
+                    <PhoneCall className="w-7 h-7 stroke-[2.5]" />
+                  </div>
+                  <span className="bg-amber-200 text-amber-950 font-black text-[10px] uppercase px-3 py-1 rounded-full tracking-wider shadow-xs">
+                    INSTANT CALL
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="font-display font-black text-xl sm:text-2xl text-stone-900 group-hover:text-amber-950">
+                    Call to Order
+                  </h3>
+                  <p className="text-stone-600 text-xs sm:text-sm mt-1.5 leading-relaxed font-medium">
+                    Prefer ordering over the phone? Tap here to place your grocery order directly with our support executive.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className="w-full py-4 px-6 bg-amber-400 group-hover:bg-amber-500 text-stone-950 font-extrabold text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md transition-all"
+              >
+                <PhoneCall className="w-4 h-4 stroke-[2.5]" />
+                <span>Call to Order</span>
+                <ArrowRight className="w-4 h-4 stroke-[3] group-hover:translate-x-1 transition-transform" />
+              </div>
+            </a>
 
           </div>
         </div>

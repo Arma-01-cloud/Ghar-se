@@ -6,6 +6,9 @@ import { Store, ChevronRight, MapPin } from 'lucide-react';
 export default function LocalStoresSection() {
   const { setActiveTab, availableStores, currentLocation, setIsLocationModalOpen } = useCart();
 
+  // Show only 4 stores on the Home page
+  const displayedStores = (availableStores || []).slice(0, 4);
+
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
       
@@ -23,7 +26,7 @@ export default function LocalStoresSection() {
 
         <button
           onClick={() => setIsLocationModalOpen(true)}
-          className="text-xs font-bold text-emerald-300 hover:text-white bg-emerald-900/80 px-3.5 py-2 rounded-xl border border-emerald-700/60 transition-colors"
+          className="text-xs font-bold text-emerald-300 hover:text-white bg-emerald-900/80 px-3.5 py-2 rounded-xl border border-emerald-700/60 transition-colors cursor-pointer"
         >
           Change Location 📍
         </button>
@@ -41,13 +44,15 @@ export default function LocalStoresSection() {
           </p>
         </div>
 
-        <button
-          onClick={() => setActiveTab('stores')}
-          className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-emerald-800 hover:underline shrink-0"
-        >
-          <span>View All Stores ({availableStores.length})</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        {availableStores.length > 4 && (
+          <button
+            onClick={() => setActiveTab('stores')}
+            className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-emerald-800 hover:underline shrink-0 cursor-pointer"
+          >
+            <span>View All Stores ({availableStores.length})</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* EMPTY STATE */}
@@ -59,12 +64,26 @@ export default function LocalStoresSection() {
         </div>
       )}
 
-      {/* STORES GRID SORTED BY HAVERSINE DISTANCE */}
-      {availableStores.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {availableStores.map(store => (
+      {/* STORES GRID (SHOWS MAXIMUM 4 STORES ON HOME PAGE) */}
+      {displayedStores.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {displayedStores.map(store => (
             <StoreCard key={store.id} store={store} />
           ))}
+        </div>
+      )}
+
+      {/* SHOW MORE STORES CTA BUTTON */}
+      {availableStores.length > 4 && (
+        <div className="pt-2 flex justify-center">
+          <button
+            onClick={() => setActiveTab('stores')}
+            className="w-full sm:w-auto px-8 py-4 bg-emerald-950 hover:bg-emerald-900 text-white font-extrabold text-sm rounded-2xl border-2 border-emerald-700/80 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2.5 group cursor-pointer active:scale-95"
+          >
+            <Store className="w-4.5 h-4.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span>Show More</span>
+            <ChevronRight className="w-4 h-4 text-emerald-300 stroke-[3] group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       )}
 

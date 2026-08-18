@@ -1,8 +1,7 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
 import { 
-  ArrowUpRight, Sparkles, Store, 
-  Clock, Home as HomeIcon, FileEdit
+  Store, Home as HomeIcon, FileEdit, Upload, PhoneCall
 } from 'lucide-react';
 
 export default function MobileBottomNav() {
@@ -18,28 +17,26 @@ export default function MobileBottomNav() {
     },
     {
       id: 'stores',
-      label: 'Store',
+      label: 'Shops',
       icon: Store,
       action: () => setActiveTab('stores'),
       isActive: activeTab === 'stores' || activeTab === 'store-detail'
     },
     {
-      id: 'upload',
+      id: 'any-store',
       label: 'Manual',
       icon: FileEdit,
-      action: () => setActiveTab('upload'),
-      isActive: activeTab === 'upload'
+      action: () => setActiveTab('any-store'),
+      isActive: activeTab === 'any-store'
     },
     {
-      id: 'orders',
-      label: 'Orders',
-      icon: Clock,
-      action: () => setActiveTab('orders'),
-      isActive: activeTab === 'orders'
+      id: 'upload',
+      label: 'Upload',
+      icon: Upload,
+      action: () => setActiveTab('upload'),
+      isActive: activeTab === 'upload'
     }
   ];
-
-  const isAnyStoreActive = activeTab === 'any-store';
 
   return (
     <nav 
@@ -48,7 +45,7 @@ export default function MobileBottomNav() {
     >
       <div className="max-w-lg mx-auto flex items-center justify-between gap-1 sm:gap-2">
         
-        {/* NAVIGATION TABS: HOME, STORE, MANUAL, ORDERS */}
+        {/* NAVIGATION TABS: HOME, SHOPS, MANUAL, UPLOAD */}
         <div className="flex items-center justify-around flex-1 gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -93,27 +90,20 @@ export default function MobileBottomNav() {
           })}
         </div>
 
-        {/* 5. SHOP FROM ANY STORE COMPONENT BUTTON */}
+        {/* 5. CALL TO ORDER BUTTON (IN PLACE OF SHOP FROM ANY STORE) */}
         <div className="pl-1 shrink-0">
-          <button
-            onClick={() => setActiveTab('any-store')}
-            className={`active:scale-95 font-extrabold text-xs px-3 sm:px-3.5 py-2 rounded-2xl shadow-md border flex items-center gap-1.5 transition-all cursor-pointer group ${
-              isAnyStoreActive
-                ? 'bg-[#0E382B] text-white border-emerald-500 ring-2 ring-emerald-400/80 shadow-lg shadow-emerald-950/20'
-                : 'bg-gradient-to-tr from-[#08241B] to-[#0E382B] hover:from-[#0E382B] hover:to-[#134E3A] text-white border-emerald-700/60'
-            }`}
-            title="Shop From Any Store - Multi-store express order builder"
+          <a
+            href="tel:8123821300"
+            className="active:scale-95 font-extrabold text-xs px-2.5 sm:px-3 py-2 rounded-2xl shadow-md border flex items-center gap-1.5 transition-all cursor-pointer group bg-gradient-to-tr from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 border-amber-300/80 shadow-amber-400/20"
+            title="Call to Order: 8123821300"
           >
-            <div className="flex items-center gap-1">
-              <Sparkles className={`w-3.5 h-3.5 text-amber-300 transition-transform ${
-                isAnyStoreActive ? 'rotate-12 scale-110' : 'group-hover:rotate-12'
-              }`} />
-              <span className="font-display font-black tracking-tight text-[11px] uppercase text-emerald-100 whitespace-nowrap">
-                Shop From Any Store
+            <div className="flex items-center gap-1.5">
+              <PhoneCall className="w-3.5 h-3.5 text-stone-950 stroke-[2.5] group-hover:rotate-12 transition-transform" />
+              <span className="font-display font-black tracking-tight text-[10px] sm:text-[11px] uppercase text-stone-950 whitespace-nowrap">
+                Call to Order
               </span>
             </div>
-            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5] shrink-0" />
-          </button>
+          </a>
         </div>
 
       </div>
