@@ -21,11 +21,12 @@ export default function StoresPage() {
     setErrorMsg(null);
 
     try {
-      const lat = currentLocation?.latitude || 12.9784;
-      const lon = currentLocation?.longitude || 77.6408;
+      const lat = currentLocation?.latitude;
+      const lon = currentLocation?.longitude;
       const locName = currentLocation?.name || '';
+      const cityName = currentLocation?.city || '';
 
-      const { stores: fetchedStores, error } = await fetchStores(lat, lon, locName);
+      const { stores: fetchedStores, error } = await fetchStores(lat, lon, locName, cityName);
 
       if (error) {
         setErrorMsg('Unable to load local stores. Please check connection.');
@@ -56,13 +57,18 @@ export default function StoresPage() {
       }
 
       if (store.rating < minRating) return false;
-      if (store.distanceKm > maxDistance) return false;
+      if (store.distanceKm != null && store.distanceKm > maxDistance) return false;
       if (selectedCategory !== 'all' && (!store.categories || !store.categories.includes(selectedCategory))) return false;
 
       return true;
     }).sort((a, b) => {
       if (sortBy === 'rating') return b.rating - a.rating;
-      if (sortBy === 'distance') return (a.distanceKm || 0) - (b.distanceKm || 0);
+      if (sortBy === 'distance') {
+        if (a.distanceKm != null && b.distanceKm != null) return a.distanceKm - b.distanceKm;
+        if (a.distanceKm != null) return -1;
+        if (b.distanceKm != null) return 1;
+        return 0;
+      }
       if (sortBy === 'delivery') return parseInt(a.deliveryTime || '0') - parseInt(b.deliveryTime || '0');
       return (b.reviews || 0) - (a.reviews || 0);
     });
@@ -76,13 +82,13 @@ export default function StoresPage() {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider mb-2">
             <Store className="w-4 h-4 text-emerald-600" />
-            <span>LOCAL GROCERY STORES • SUPABASE LIVE DATA</span>
+            <span>LOCAL GROCERY STORES • REAL TIME PROXIMITY</span>
           </div>
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight">
             All Local Grocery Stores
           </h1>
           <p className="text-stone-500 text-sm mt-1">
-            Choose a nearby store to order fresh groceries directly to your home in <strong className="text-stone-800">{currentLocation?.name || 'Indiranagar, Bengaluru'}</strong>
+            Choose a nearby store to order fresh groceries directly to your home in <strong className="text-stone-800">{currentLocation?.name || 'your area'}</strong>
           </p>
         </div>
 

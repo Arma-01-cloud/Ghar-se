@@ -9,6 +9,8 @@ import {
   CheckCircle2, Phone, Package, RefreshCw 
 } from 'lucide-react';
 
+import { formatDistance } from '../services/locationService';
+
 export default function StoreDetailPage() {
   const { 
     selectedStoreId, 
@@ -39,7 +41,12 @@ export default function StoreDetailPage() {
 
   const handleSelectThisStore = () => {
     setCurrentStore(store);
+    setSelectedStoreId(store.id);
   };
+
+  const distanceDisplay = store.formattedDistance || 
+    (store.distanceKm != null ? formatDistance(store.distanceKm) : null) || 
+    (typeof store.distance === 'string' && (store.distance.includes('m') || store.distance.includes('km')) ? store.distance : null);
 
   const handleBackToStores = () => {
     setSelectedStoreId(null);
@@ -163,7 +170,7 @@ export default function StoreDetailPage() {
                 {store.name}
               </h1>
               <p className="text-xs sm:text-sm text-stone-500 font-medium flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-emerald-700 shrink-0" /> {store.address || `${store.locality}, ${store.city}`} ({store.distance || '1.2 km'} away)
+                <MapPin className="w-4 h-4 text-emerald-700 shrink-0" /> {store.address || `${store.locality}, ${store.city}`}{distanceDisplay ? ` (${distanceDisplay} away)` : ''}
               </p>
 
               {/* SHOPKEEPER CONTACT BADGE */}

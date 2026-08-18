@@ -185,7 +185,7 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
                 {currentStore?.name || 'Sri Lakshmi Stores'}
               </span>
               <span className="text-emerald-300 text-[11px] font-semibold hidden md:inline">
-                • {currentStore?.distance || '1.2 km'} away • ⚡ {currentStore?.deliveryTime || 'Delivery after 4:00 PM'}
+                {currentStore?.formattedDistance ? `• ${currentStore.formattedDistance} away • ` : (currentStore?.locality ? `• ${currentStore.locality} • ` : '• ')}⚡ {currentStore?.deliveryTime || 'Delivery after 4:00 PM'}
               </span>
             </div>
 

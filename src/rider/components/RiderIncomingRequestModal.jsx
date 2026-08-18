@@ -210,7 +210,7 @@ export default function RiderIncomingRequestModal({ notification, onAccept, onDe
               </div>
               <div className="flex items-center gap-1 justify-end text-stone-400 text-[11px]">
                 <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                <span>{payload.distance || '1.8 km away'}</span>
+                <span>{payload.distance || 'Local Delivery'}</span>
               </div>
             </div>
           </div>

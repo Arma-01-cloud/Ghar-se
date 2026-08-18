@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   getCurrentPositionWithAddress, 
   searchLocationPlaces, 
-  saveCustomerPhoneAddress 
+  saveCustomerPhoneAddress,
+  resolveAddressCoordinates
 } from '../services/locationService';
 import { 
   MapPin, Navigation, Phone, CheckCircle2, X, Search, 
@@ -28,15 +29,15 @@ export default function LocationModal({ isOpen, onClose, currentLocation, onSele
   // Active Location Coordinates & Structured Info
   const [activeLocation, setActiveLocation] = useState(() => {
     return {
-      name: currentLocation?.name || 'Indiranagar, Bengaluru',
-      area: currentLocation?.area || (currentLocation?.name?.split(',')[0]?.trim()) || 'Indiranagar',
-      district: currentLocation?.district || 'Bengaluru Urban',
-      city: currentLocation?.city || 'Bengaluru',
+      name: currentLocation?.name || 'Market Road, Chikkamagaluru',
+      area: currentLocation?.area || (currentLocation?.name?.split(',')[0]?.trim()) || 'Market Road',
+      district: currentLocation?.district || 'Chikkamagaluru',
+      city: currentLocation?.city || 'Chikkamagaluru',
       state: currentLocation?.state || 'Karnataka',
-      pincode: currentLocation?.pincode || '560038',
-      formattedAddress: currentLocation?.formattedAddress || currentLocation?.name || 'Indiranagar, Bengaluru, Karnataka - 560038',
-      latitude: currentLocation?.latitude || 12.9784,
-      longitude: currentLocation?.longitude || 77.6408
+      pincode: currentLocation?.pincode || '577101',
+      formattedAddress: currentLocation?.formattedAddress || currentLocation?.name || 'Market Road, Chikkamagaluru, Karnataka - 577101',
+      latitude: currentLocation?.latitude || 13.3161,
+      longitude: currentLocation?.longitude || 75.7720
     };
   });
 
@@ -176,16 +177,36 @@ export default function LocationModal({ isOpen, onClose, currentLocation, onSele
 
   // Handler: Confirm & Apply Delivery Location
   const handleConfirmLocation = () => {
+    const rawFullText = `${houseNumber ? houseNumber + ', ' : ''}${landmark ? landmark + ', ' : ''}${activeLocation.name || ''}`;
+    const resolvedCoords = resolveAddressCoordinates(rawFullText, landmark || activeLocation.area, activeLocation.city);
+
+    let finalLat = activeLocation.latitude;
+    let finalLon = activeLocation.longitude;
+
+    const textCheck = `${rawFullText} ${activeLocation.formattedAddress || ''}`.toLowerCase();
+    if (textCheck.includes('uppalli')) {
+      finalLat = 13.3284;
+      finalLon = 75.7578;
+    } else if (textCheck.includes('chikmagalur') || textCheck.includes('chikkamagaluru') || textCheck.includes('577101')) {
+      if (finalLat == null || finalLat < 13.1) {
+        finalLat = 13.3161;
+        finalLon = 75.7720;
+      }
+    } else if (finalLat == null || finalLon == null) {
+      finalLat = resolvedCoords.latitude;
+      finalLon = resolvedCoords.longitude;
+    }
+
     const finalLocation = {
       name: activeLocation.name,
-      area: activeLocation.area,
+      area: activeLocation.area || resolvedCoords.area,
       district: activeLocation.district,
-      city: activeLocation.city,
+      city: activeLocation.city || resolvedCoords.city,
       state: activeLocation.state,
       pincode: activeLocation.pincode,
       formattedAddress: activeLocation.formattedAddress,
-      latitude: activeLocation.latitude,
-      longitude: activeLocation.longitude,
+      latitude: finalLat,
+      longitude: finalLon,
       flat: houseNumber.trim(),
       street: landmark.trim(),
       tag: addressTag
@@ -214,8 +235,8 @@ export default function LocationModal({ isOpen, onClose, currentLocation, onSele
             city: activeLocation.city,
             state: activeLocation.state,
             pincode: activeLocation.pincode,
-            latitude: activeLocation.latitude,
-            longitude: activeLocation.longitude,
+            latitude: finalLat,
+            longitude: finalLon,
             addressText: `${houseNumber ? houseNumber + ', ' : ''}${landmark ? landmark + ', ' : ''}${activeLocation.formattedAddress}`
           });
         }

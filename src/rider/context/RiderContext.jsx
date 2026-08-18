@@ -338,7 +338,7 @@ export const RiderProvider = ({ children }) => {
                     totalAmount: newOrder.total_amount || 0,
                     paymentStatus: newOrder.payment_method || 'Cash on Delivery',
                     estimatedEarnings: isAnyStoreOrder ? 85 : 65,
-                    distance: '1.8 km',
+                    distance: 'Local Delivery',
                     estimatedTime: 'Delivery after 4:00 PM'
                   }
                 };
@@ -425,7 +425,7 @@ export const RiderProvider = ({ children }) => {
       customerName: payload.customerName || 'Customer',
       customerPhone: payload.customerPhone || 'Phone not provided',
       deliveryAddress: payload.deliveryAddress || 'Chikkamagaluru, Karnataka',
-      distance: payload.distance || '1.8 km',
+      distance: payload.distance || 'Local Delivery',
       estimatedTime: payload.estimatedTime || 'Delivery after 4:00 PM',
       items: payload.items || ['Grocery Items'],
       parsedItems: payload.parsedItems || [],

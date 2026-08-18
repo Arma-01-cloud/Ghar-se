@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { STORES } from '../data/stores';
 import { fetchStores } from '../services/storeService';
-import { fetchCustomerAddressByPhone, saveCustomerPhoneAddress } from '../services/locationService';
+import { fetchCustomerAddressByPhone, saveCustomerPhoneAddress, resolveAddressCoordinates } from '../services/locationService';
 import { fetchCustomerOrders, createOrderInSupabase } from '../services/orderService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import confetti from 'canvas-confetti';
@@ -41,7 +41,27 @@ export const CartProvider = ({ children }) => {
   const [currentLocation, setCurrentLocation] = useState(() => {
     try {
       const saved = localStorage.getItem('gharsee_current_location');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const textCheck = `${parsed.name || ''} ${parsed.formattedAddress || ''} ${parsed.street || ''} ${parsed.area || ''}`.toLowerCase();
+        
+        // Self-heal corrupted cached coordinates from previous sessions
+        if (textCheck.includes('uppalli')) {
+          parsed.latitude = 13.3284;
+          parsed.longitude = 75.7578;
+        } else if (textCheck.includes('chikmagalur') || textCheck.includes('chikkamagaluru') || textCheck.includes('577101')) {
+          if (parsed.latitude == null || parsed.latitude < 13.1) {
+            parsed.latitude = 13.3161;
+            parsed.longitude = 75.7720;
+          }
+        } else if (textCheck.includes('indiranagar') || textCheck.includes('bengaluru')) {
+          if (parsed.latitude == null || parsed.latitude > 13.1) {
+            parsed.latitude = 12.9784;
+            parsed.longitude = 77.6408;
+          }
+        }
+        return parsed;
+      }
     } catch {}
     return {
       latitude: 13.3161,
@@ -180,11 +200,12 @@ export const CartProvider = ({ children }) => {
   // Fetch live stores from Supabase when location changes
   useEffect(() => {
     async function loadNearbyStores() {
-      const lat = currentLocation?.latitude || 13.3161;
-      const lon = currentLocation?.longitude || 75.7720;
+      const lat = currentLocation?.latitude;
+      const lon = currentLocation?.longitude;
       const locName = currentLocation?.name || '';
+      const cityName = currentLocation?.city || '';
 
-      const res = await fetchStores(lat, lon, locName);
+      const res = await fetchStores(lat, lon, locName, cityName);
       if (res.stores && res.stores.length > 0) {
         setAvailableStores(res.stores);
         if (!currentStore || !res.stores.some(s => s.id === currentStore.id)) {
@@ -248,16 +269,39 @@ export const CartProvider = ({ children }) => {
 
   const setCustomerLocation = (loc) => {
     if (!loc) return;
+    const resolvedCoords = resolveAddressCoordinates(
+      loc.formattedAddress || loc.name,
+      loc.area || loc.street,
+      loc.city
+    );
+
+    let finalLat = loc.latitude;
+    let finalLon = loc.longitude;
+
+    const textCheck = `${loc.name || ''} ${loc.formattedAddress || ''} ${loc.area || ''} ${loc.street || ''} ${loc.city || ''}`.toLowerCase();
+    if (textCheck.includes('uppalli')) {
+      finalLat = 13.3284;
+      finalLon = 75.7578;
+    } else if (textCheck.includes('chikmagalur') || textCheck.includes('chikkamagaluru') || textCheck.includes('577101')) {
+      if (finalLat == null || finalLat < 13.1) {
+        finalLat = 13.3161;
+        finalLon = 75.7720;
+      }
+    } else if (finalLat == null || finalLon == null) {
+      finalLat = resolvedCoords.latitude;
+      finalLon = resolvedCoords.longitude;
+    }
+
     const enriched = {
       name: loc.name || `${loc.area || ''}, ${loc.city || ''}`.trim() || 'Chikkamagaluru, Karnataka',
-      area: loc.area || (loc.name?.split(',')[0]?.trim()) || 'Local Area',
+      area: loc.area || (loc.name?.split(',')[0]?.trim()) || resolvedCoords.area || 'Local Area',
       district: loc.district || loc.city || 'District',
-      city: loc.city || (loc.name?.split(',')[1]?.trim()) || 'Chikkamagaluru',
+      city: loc.city || (loc.name?.split(',')[1]?.trim()) || resolvedCoords.city || 'Chikkamagaluru',
       state: loc.state || 'Karnataka',
       pincode: loc.pincode || '577101',
       formattedAddress: loc.formattedAddress || loc.name,
-      latitude: loc.latitude || 13.3161,
-      longitude: loc.longitude || 75.7720,
+      latitude: finalLat,
+      longitude: finalLon,
       flat: loc.flat || '',
       street: loc.street || loc.streetAddress || '',
       tag: loc.tag || 'Home'

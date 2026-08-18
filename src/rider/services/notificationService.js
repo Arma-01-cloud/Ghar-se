@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { get10DigitPhone } from '../../services/authService';
+import { calculateHaversineDistance, formatDistance } from '../../services/locationService';
 
 // Broadcast a new order notification to all online riders in Supabase
 export async function broadcastOrderToRidersInSupabase(orderData) {
@@ -22,6 +23,9 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
     let storePhone = '+91 81238 21300';
     let storeAddress = 'Market Road, Chikkamagaluru';
 
+    let shopLat = null;
+    let shopLon = null;
+
     if (orderData.store_id) {
       const { data: shopRow } = await supabase
         .from('shops')
@@ -33,6 +37,8 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
         storeName = shopRow.name || storeName;
         storePhone = shopRow.phone || shopRow.shopkeeper_phone || storePhone;
         storeAddress = shopRow.address || storeAddress;
+        shopLat = shopRow.latitude;
+        shopLon = shopRow.longitude;
       }
     } else {
       const { data: allShops } = await supabase.from('shops').select('*');
@@ -42,8 +48,19 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
           storeName = matched.name;
           storePhone = matched.phone || matched.shopkeeper_phone || storePhone;
           storeAddress = matched.address || storeAddress;
+          shopLat = matched.latitude;
+          shopLon = matched.longitude;
         }
       }
+    }
+
+    // Calculate real delivery distance if coordinates available
+    const deliveryLat = orderData.delivery_latitude || orderData.latitude;
+    const deliveryLon = orderData.delivery_longitude || orderData.longitude;
+    let orderDistance = null;
+    if (shopLat != null && shopLon != null && deliveryLat != null && deliveryLon != null) {
+      const dist = calculateHaversineDistance(shopLat, shopLon, deliveryLat, deliveryLon);
+      orderDistance = formatDistance(dist);
     }
 
     // 3. Prepare rich notification payload JSONB (Support Grocery Image Orders & Standard Orders)
@@ -104,7 +121,7 @@ export async function broadcastOrderToRidersInSupabase(orderData) {
       totalAmount: orderData.total_amount || orderData.totalAmount || orderData.total || 0,
       paymentStatus: orderData.payment_method || orderData.paymentMethod || 'Cash on Delivery',
       estimatedEarnings: isAnyStore ? 85 : 65, // Higher payout for multi-store delivery!
-      distance: '1.8 km',
+      distance: orderDistance || 'Local Delivery',
       estimatedTime: 'Delivery after 4:00 PM'
     };
 

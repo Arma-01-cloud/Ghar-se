@@ -2,6 +2,8 @@ import React from 'react';
 import { useCart } from '../context/CartContext';
 import { Star, MapPin, Clock, Heart, Store, ChevronRight, Phone } from 'lucide-react';
 
+import { formatDistance } from '../services/locationService';
+
 export default function StoreCard({ store, onSelectStore }) {
   const { currentStore, setCurrentStore, favoriteStores, toggleFavoriteStore, setActiveTab, setSelectedStoreId } = useCart();
 
@@ -26,9 +28,9 @@ export default function StoreCard({ store, onSelectStore }) {
     ? store.categories 
     : ['Groceries', 'Dairy & Eggs', 'Cooking Essentials'];
 
-  const distanceText = typeof store.distance === 'string' && store.distance.includes('km')
-    ? store.distance
-    : `${store.distanceKm || store.distance || 1.2} km away`;
+  const distanceDisplay = store.formattedDistance || 
+    (store.distanceKm != null ? formatDistance(store.distanceKm) : null) || 
+    (typeof store.distance === 'string' && (store.distance.includes('m') || store.distance.includes('km')) ? store.distance : 'Location required');
 
   return (
     <div
@@ -91,8 +93,8 @@ export default function StoreCard({ store, onSelectStore }) {
         </div>
 
         <div className="flex items-center gap-3 text-xs font-semibold text-stone-500">
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5 text-emerald-700" /> {distanceText}
+          <span className="flex items-center gap-1 font-bold text-emerald-950">
+            <MapPin className="w-3.5 h-3.5 text-emerald-700" /> {distanceDisplay}
           </span>
           <span>•</span>
           <span className="flex items-center gap-1">
