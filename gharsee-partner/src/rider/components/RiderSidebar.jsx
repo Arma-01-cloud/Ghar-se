@@ -23,18 +23,19 @@ export default function RiderSidebar() {
         
         <div className="space-y-6">
           {/* LOGO */}
-          <div className="flex items-center gap-3 px-2 pt-2 cursor-pointer" onClick={() => setActiveRiderTab('dashboard')}>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-emerald-950 flex items-center justify-center font-bold shadow-lg">
-              <Leaf className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div>
-              <span className="font-display font-extrabold text-xl tracking-tight text-white block leading-none">
-                Ghar<span className="text-emerald-400">See</span>
-              </span>
-              <span className="text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider">
-                Delivery Partner
-              </span>
-            </div>
+          <div className="flex flex-col items-start px-2 pt-2 cursor-pointer" onClick={() => setActiveRiderTab('dashboard')}>
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-8 sm:h-9 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
+            <span className="text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider block mt-1">
+              Delivery Partner
+            </span>
           </div>
 
           {/* NAV LINKS */}

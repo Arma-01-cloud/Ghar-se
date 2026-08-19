@@ -44,7 +44,7 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
       return;
     }
 
-    setFeedback({ type: 'success', message: 'Welcome to GharSee! Your Customer account is ready.' });
+    setFeedback({ type: 'success', message: 'Welcome to UR GROZY! Your Customer account is ready.' });
     setTimeout(() => {
       onComplete({ role: 'customer', user: res.user });
     }, 800);
@@ -76,7 +76,7 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
 
     setFeedback({
       type: 'success',
-      message: 'Welcome to GharSee! Your Shopkeeper account is ready.'
+      message: 'Welcome to UR GROZY! Your Shopkeeper account is ready.'
     });
 
     setTimeout(() => {
@@ -108,7 +108,7 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
 
     setFeedback({
       type: 'success',
-      message: 'Welcome to GharSee! Your Rider account is ready.'
+      message: 'Welcome to UR GROZY! Your Rider account is ready.'
     });
 
     setTimeout(() => {
@@ -149,12 +149,20 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
         
         {/* BRAND LOGO */}
         <div className="text-center space-y-3">
-          <div className="w-16 h-16 rounded-3xl bg-emerald-800 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/20">
-            <Leaf className="w-9 h-9 stroke-[2.5]" />
+          <div className="flex justify-center pb-1">
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-14 sm:h-16 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
           </div>
           <div>
-            <h1 className="font-display font-black text-3xl sm:text-4xl text-stone-950 tracking-tight">
-              Welcome to Ghar<span className="text-emerald-600">See</span>
+            <h1 className="font-display font-black text-2xl sm:text-3xl text-stone-950 tracking-tight">
+              Welcome to UR GROZY
             </h1>
             <p className="text-stone-500 text-xs sm:text-sm font-medium mt-1">
               Your Daily Groceries, Delivered Fresh from Local Stores
@@ -180,7 +188,7 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
           <div className="space-y-6">
             <div className="text-center">
               <h2 className="font-display font-extrabold text-lg text-stone-900">
-                How do you want to use GharSee?
+                How do you want to use UR GROZY?
               </h2>
               <p className="text-stone-500 text-xs mt-0.5">Select your role to get started</p>
             </div>
@@ -495,7 +503,7 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
         {authMode === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4 text-xs font-semibold">
             <h3 className="font-display font-black text-lg text-stone-900 text-center">
-              Log In to GharSee
+              Log In to UR GROZY
             </h3>
 
             <div>
@@ -546,7 +554,7 @@ export default function RoleSelectionOnboarding({ onComplete, onContinueAsGuest 
         <div className="pt-4 border-t border-stone-100 text-center text-xs">
           {authMode === 'signup' ? (
             <p className="text-stone-500 font-medium">
-              Already registered on GharSee?{' '}
+              Already registered on UR GROZY?{' '}
               <button
                 onClick={() => { setAuthMode('login'); setSelectedRole(null); }}
                 className="font-bold text-emerald-800 hover:underline"

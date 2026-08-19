@@ -24,18 +24,19 @@ export default function ShopkeeperSidebar({ isMobileOpen, onCloseMobile }) {
       <div className="space-y-6">
         {/* BRAND LOGO */}
         <div className="flex items-center justify-between px-2 pt-2">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveShopkeeperTab('dashboard')}>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-emerald-950 flex items-center justify-center font-bold shadow-lg">
-              <Leaf className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div>
-              <span className="font-display font-extrabold text-xl tracking-tight text-white block leading-none">
-                Ghar<span className="text-emerald-400">See</span>
-              </span>
-              <span className="text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider">
-                Store Partner
-              </span>
-            </div>
+          <div className="flex flex-col items-start cursor-pointer" onClick={() => setActiveShopkeeperTab('dashboard')}>
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-8 sm:h-9 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
+            <span className="text-[10px] text-emerald-300 font-extrabold uppercase tracking-wider block mt-1">
+              Store Partner
+            </span>
           </div>
 
           {onCloseMobile && (

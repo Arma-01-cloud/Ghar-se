@@ -11,7 +11,7 @@ export default function RiderPendingApprovalView({ onLogout }) {
 
   const handleCheckStatus = async () => {
     setIsChecking(true);
-    addRiderToast('Checking verification status with Ghar See Admin...', 'info');
+    addRiderToast('Checking verification status with UR GROZY Admin...', 'info');
 
     setTimeout(async () => {
       if (refreshRiderProfile) {
@@ -43,7 +43,7 @@ export default function RiderPendingApprovalView({ onLogout }) {
             Welcome, {riderProfile?.fullName || 'Delivery Partner'}!
           </h2>
           <p className="text-stone-400 text-xs sm:text-sm leading-relaxed">
-            Your rider onboarding request has been submitted to the <strong>Ghar See Admin Operations Team</strong>.
+            Your rider onboarding request has been submitted to the <strong>UR GROZY Admin Operations Team</strong>.
           </p>
         </div>
 
@@ -89,7 +89,7 @@ export default function RiderPendingApprovalView({ onLogout }) {
         <div className="p-3.5 bg-emerald-950/40 border border-emerald-800/40 rounded-2xl text-left flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-emerald-200/90 leading-snug">
-            Once Ghar See Admin approves your vehicle & license credentials, your rider portal will activate immediately so you can toggle online and receive deliveries.
+            Once UR GROZY Admin reviews and approves your documents, you will be able to go online and receive live delivery requests.
           </p>
         </div>
 

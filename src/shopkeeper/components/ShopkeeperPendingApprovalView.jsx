@@ -11,7 +11,7 @@ export default function ShopkeeperPendingApprovalView({ onLogout }) {
 
   const handleCheckStatus = async () => {
     setIsChecking(true);
-    addShopkeeperToast('Checking approval status with Ghar See Admin...', 'info');
+    addShopkeeperToast('Checking approval status with UR GROZY Admin...', 'info');
 
     setTimeout(async () => {
       if (reloadOrdersAndShop) {
@@ -43,7 +43,7 @@ export default function ShopkeeperPendingApprovalView({ onLogout }) {
             Welcome, {storeProfile?.name || 'Store Partner'}!
           </h2>
           <p className="text-stone-400 text-xs sm:text-sm leading-relaxed">
-            Your store registration has been successfully submitted to the <strong>Ghar See Administration Team</strong>.
+            Your store registration has been successfully submitted to the <strong>UR GROZY Administration Team</strong>.
           </p>
         </div>
 
@@ -81,7 +81,7 @@ export default function ShopkeeperPendingApprovalView({ onLogout }) {
         <div className="p-3.5 bg-emerald-950/40 border border-emerald-800/40 rounded-2xl text-left flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-emerald-200/90 leading-snug">
-            Once Ghar See Admin reviews and accepts your store, your order dashboard will unlock immediately and your store will become visible on the customer app.
+            Once UR GROZY Admin reviews and accepts your store, your order dashboard will unlock immediately and your store will become visible on the customer app.
           </p>
         </div>
 

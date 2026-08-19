@@ -34,22 +34,18 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
             
             {/* 1. BRAND LOGO (AT FLEX START) */}
             <div 
-              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none shrink-0 group mr-1" 
+              className="flex items-center cursor-pointer select-none shrink-0 group mr-2" 
               onClick={() => setActiveTab('home')}
             >
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-[#08241B] to-[#0E382B] flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform shrink-0">
-                <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 stroke-[2.5]" />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-display font-black text-xl sm:text-2xl tracking-tight text-emerald-950">
-                    Ghar<span className="text-emerald-600">See</span>
-                  </span>
-                </div>
-                <span className="text-[10px] sm:text-[11px] text-stone-500 font-semibold tracking-wide hidden xs:inline leading-none mt-0.5">
-                  Local Groceries Delivered
-                </span>
-              </div>
+              <img 
+                src="/ur-grozy-logo.png" 
+                alt="UR GROZY" 
+                className="h-8 sm:h-10 md:h-11 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/logo.png';
+                }}
+              />
             </div>
 
             {/* 2. LOCATION SELECTOR PILL */}
@@ -189,7 +185,7 @@ export default function Navbar({ onSearchQuery, searchQuery }) {
                 {currentStore?.name || 'Sri Lakshmi Stores'}
               </span>
               <span className="text-emerald-300 text-[11px] font-semibold hidden md:inline">
-                • {currentStore?.distance || '1.2 km'} away • ⚡ {currentStore?.deliveryTime || 'Delivery after 4:00 PM'}
+                {currentStore?.formattedDistance ? `• ${currentStore.formattedDistance} away • ` : (currentStore?.locality ? `• ${currentStore.locality} • ` : '• ')}⚡ {currentStore?.deliveryTime || 'Delivery after 4:00 PM'}
               </span>
             </div>
 

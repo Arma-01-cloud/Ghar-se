@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { get10DigitPhone } from './authService';
-import { broadcastOrderToRidersInSupabase } from './riderService';
+import { broadcastOrderToRidersInSupabase } from '../rider/services/notificationService';
 
 const STORAGE_BUCKET = 'grocery-orders';
 
@@ -84,7 +84,7 @@ export function generateGroceryImageWhatsAppMessage({
   const displayCustPhone = customerPhone || 'Not provided';
 
   const messageText = 
-`🛒 *New GharSee Order*
+`🛒 *New UR GROZY Order*
 
 A new grocery image order has been received.
 
@@ -97,7 +97,7 @@ ${displayCustPhone}
 *Order ID:*
 #${orderId}
 
-Please open your GharSee Partner dashboard to view and process the order:
+Please open your UR GROZY Partner dashboard to view and process the order:
 https://ghar-se-partner-git-main-ssa12.vercel.app/`;
 
   const encodedMessage = encodeURIComponent(messageText);

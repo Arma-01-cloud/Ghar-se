@@ -83,7 +83,7 @@ export function AdminProvider({ children }) {
         sessionStorage.setItem('gharsee_admin_authenticated', 'true');
         sessionStorage.setItem('gharsee_admin_user', username);
       } catch {}
-      addAdminToast('Welcome to Ghar See Admin Command Center 🛡️', 'success');
+      addAdminToast('Welcome to UR GROZY Admin Command Center 🛡️', 'success');
       try {
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
       } catch {}

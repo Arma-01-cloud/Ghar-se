@@ -1,6 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { get10DigitPhone } from './authService';
 import { broadcastOrderToRidersInSupabase } from '../rider/services/notificationService';
+import { isValidOrderStatus, isValidOrderStatusTransition, validateOrderPayload } from '../utils/validators';
+import { calculateHaversineDistance, formatDistance } from './locationService';
+import { resolveStoreCoordinates } from './storeService';
 
 // Resolve base URL for partner app (supports VITE_PARTNER_APP_URL, VITE_PARTNER_URL, Vercel multi-subdomain patterns, and current origin fallback)
 export function getPartnerAppBaseUrl() {
@@ -55,7 +58,7 @@ export function generateShopkeeperWhatsAppUrl(shopkeeperPhone, order, customerNa
   }
 
   const messageText = 
-`🛒 *New GharSee Order*
+`🛒 *New UR GROZY Order*
 
 *Order ID:* #${order.id}
 
@@ -70,7 +73,7 @@ ${order.address || order.deliveryAddress || 'Address not provided'}
 
 *Total Amount:* ₹${order.totalAmount || order.total || 0} (${order.paymentMethod || 'Cash on Delivery'})
 
-Please open your GharSee Partner dashboard to view and process the order:
+Please open your UR GROZY Partner dashboard to view and process the order:
 https://ghar-se-partner-git-main-ssa12.vercel.app/`;
 
   const encodedMessage = encodeURIComponent(messageText);
@@ -83,6 +86,19 @@ https://ghar-se-partner-git-main-ssa12.vercel.app/`;
 
 // Create a new order in Supabase orders and order_items tables & broadcast notification to riders
 export async function createOrderInSupabase(orderData) {
+  // Client-side validation — never trust the cart payload.
+  const validation = validateOrderPayload(orderData);
+  if (!validation.ok) {
+    console.warn('Order payload validation failed:', validation.errors);
+    return {
+      order: orderData,
+      shopkeeperPhone: '+918123821300',
+      whatsappUrl: '',
+      whatsappMessage: '',
+      error: validation.errors[0] || 'Invalid order'
+    };
+  }
+
   if (!isSupabaseConfigured) {
     const defaultWhatsApp = generateShopkeeperWhatsAppUrl(
       '+918123821300',
@@ -425,6 +441,16 @@ export async function fetchRiderDeliveries(riderId = null) {
       const storePhone = storeObj.phone || storeObj.shopkeeper_phone || '+91 81238 21300';
       const storeAddress = storeObj.address || 'Market Road, Chikkamagaluru';
 
+      const storeCoords = resolveStoreCoordinates(storeObj);
+      const deliveryLat = o.delivery_latitude || o.latitude;
+      const deliveryLon = o.delivery_longitude || o.longitude;
+
+      let computedDistance = null;
+      if (storeCoords.latitude != null && storeCoords.longitude != null && deliveryLat != null && deliveryLon != null) {
+        const dKm = calculateHaversineDistance(storeCoords.latitude, storeCoords.longitude, deliveryLat, deliveryLon);
+        computedDistance = formatDistance(dKm);
+      }
+
       return {
         id: o.id,
         rider_id: o.rider_id,
@@ -435,7 +461,7 @@ export async function fetchRiderDeliveries(riderId = null) {
         customerName: o.customer_name || 'Customer',
         customerPhone: o.customer_phone || o.phone || '',
         deliveryAddress: o.delivery_address || 'Chikkamagaluru, Karnataka',
-        distance: '1.8 km',
+        distance: computedDistance || 'Local Delivery',
         estimatedTime: 'Delivery after 4:00 PM',
         parsedItems: (o.order_items && o.order_items.length > 0) ? o.order_items.map(i => ({
           name: i.product_name || i.name,
@@ -510,10 +536,55 @@ export async function claimRiderOrderInSupabase(orderId, riderId, riderName = ''
 }
 
 // Update Order Status in Supabase with timestamp support
-export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = null) {
+// Performs a read-then-conditional-update so a client can't fast-forward an
+// order through the workflow by sending an arbitrary status, and so a
+// shopkeeper can only touch their own orders.
+export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = null, storeId = null) {
   if (!isSupabaseConfigured) return true;
 
+  if (!isValidOrderStatus(newStatus)) {
+    console.warn('updateOrderStatusInSupabase: invalid status', newStatus);
+    return false;
+  }
+
   try {
+    // Read current status to validate the transition client-side. This is
+    // defense-in-depth: the database is still the source of truth and should
+    // also enforce the workflow via a trigger or check constraint.
+    const { data: current, error: readErr } = await supabase
+      .from('orders')
+      .select('id, status, rider_id, store_id')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (readErr) {
+      console.warn('updateOrderStatusInSupabase: read failed', readErr.message);
+      return false;
+    }
+
+    if (current && current.status && !isValidOrderStatusTransition(current.status, newStatus)) {
+      console.warn(
+        `updateOrderStatusInSupabase: refused transition ${current.status} -> ${newStatus} for order ${orderId}`
+      );
+      return false;
+    }
+
+    // Authorization: a rider may only update orders assigned to them.
+    if (riderId && current && current.rider_id && String(current.rider_id) !== String(riderId)) {
+      console.warn(
+        `updateOrderStatusInSupabase: rider ${riderId} tried to update order ${orderId} assigned to ${current.rider_id}`
+      );
+      return false;
+    }
+
+    // Authorization: a shopkeeper may only update orders that belong to their store.
+    if (storeId && current && current.store_id && String(current.store_id) !== String(storeId)) {
+      console.warn(
+        `updateOrderStatusInSupabase: shop ${storeId} tried to update order ${orderId} belonging to ${current.store_id}`
+      );
+      return false;
+    }
+
     const updateData = { status: newStatus };
     if (riderId) {
       updateData.rider_id = riderId;
@@ -522,10 +593,18 @@ export async function updateOrderStatusInSupabase(orderId, newStatus, riderId = 
       updateData.delivered_at = new Date().toISOString();
     }
 
-    const { error } = await supabase
-      .from('orders')
-      .update(updateData)
-      .eq('id', orderId);
+    let query = supabase.from('orders').update(updateData).eq('id', orderId);
+
+    // Belt-and-braces: when called as a shopkeeper, also constrain the WHERE
+    // clause so the SQL update cannot leak across stores.
+    if (storeId) {
+      query = query.eq('store_id', storeId);
+    }
+    if (riderId) {
+      query = query.eq('rider_id', riderId);
+    }
+
+    const { error } = await query;
 
     return !error;
   } catch {

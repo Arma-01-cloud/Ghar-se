@@ -14,20 +14,19 @@ export default function RiderHeader() {
         
         {/* LEFT: BRAND & RIDER BADGE */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-emerald-950 flex items-center justify-center font-bold shadow-md">
-            <Bike className="w-6 h-6 stroke-[2.5]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-display font-black text-lg text-white tracking-tight">
-                Ghar<span className="text-emerald-400">See</span>
-              </span>
-              <span className="bg-emerald-500/30 text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                DELIVERY PARTNER
-              </span>
-            </div>
-            <p className="text-[11px] text-emerald-200/80 font-medium">{profile.name} • ⭐ {profile.rating}</p>
-          </div>
+          <img 
+            src="/ur-grozy-logo.png" 
+            alt="UR GROZY" 
+            className="h-8 sm:h-9 w-auto object-contain"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = '/logo.png';
+            }}
+          />
+          <span className="bg-emerald-500/30 text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider hidden xs:inline-block">
+            DELIVERY PARTNER
+          </span>
+          <p className="text-[11px] text-emerald-200/80 font-medium hidden sm:block">⭐ {profile.rating}</p>
         </div>
 
         {/* RIGHT: ONLINE/OFFLINE TOGGLE & NOTIFICATIONS & LOGOUT */}

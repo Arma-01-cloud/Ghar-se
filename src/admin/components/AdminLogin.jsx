@@ -41,16 +41,21 @@ export default function AdminLogin() {
       <div className="w-full max-w-md mx-auto bg-white rounded-3xl border border-stone-200 p-8 shadow-xl space-y-6 my-auto">
         
         {/* BRAND LOGO & TITLE */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-3xl bg-emerald-800 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/20">
-            <ShieldCheck className="w-8 h-8 stroke-[2.2]" />
+        <div className="text-center space-y-3">
+          <div className="flex justify-center pb-1">
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-12 sm:h-14 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
           </div>
           
           <div>
-            <span className="font-display font-black text-2xl text-stone-900 tracking-tight block">
-              Ghar<span className="text-emerald-600">See</span> Admin HQ
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700 uppercase tracking-wider mt-1">
+            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700 uppercase tracking-wider">
               <Lock className="w-3.5 h-3.5" />
               CENTRAL COMMAND CONSOLE
             </span>

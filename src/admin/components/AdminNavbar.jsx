@@ -66,22 +66,18 @@ export default function AdminNavbar() {
           
           {/* LOGO & BRAND */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#08241B] to-[#0E382B] text-white flex items-center justify-center shadow-md">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-display font-black text-stone-950 text-lg sm:text-xl tracking-tight">
-                  Ghar<span className="text-emerald-700">See</span>
-                </span>
-                <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
-                  ADMIN
-                </span>
-              </div>
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest hidden sm:block">
-                Operations & Governance
-              </p>
-            </div>
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-8 sm:h-9 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
+            <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+              ADMIN HQ
+            </span>
           </div>
 
           {/* DESKTOP NAV TABS */}

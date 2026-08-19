@@ -361,7 +361,7 @@ export default function ShopkeeperStorePage() {
       localStorage.setItem('gharsee_store_profile', JSON.stringify(newStoreObj));
     } catch {}
 
-    addShopkeeperToast(`🎉 Store registration submitted! Awaiting Ghar See Admin approval.`, 'info');
+    addShopkeeperToast(`🎉 Store registration submitted! Awaiting UR GROZY Admin approval.`, 'info');
   };
 
   // Handle Update Existing Store Details

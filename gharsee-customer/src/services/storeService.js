@@ -1,8 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { calculateHaversineDistance } from './locationService';
+import { calculateHaversineDistance, formatDistance, KNOWN_LOCALITY_LOOKUP } from './locationService';
 import { generateUUID } from './authService';
+import { STORES } from '../data/stores';
 
-// Extensible Locality Coordinates Mapping
+// Comprehensive Locality Coordinates Mapping for Chikkamagaluru & surrounding regions
 const LOCALITY_COORDINATES = {
   'uppalli': { latitude: 13.3284, longitude: 75.7578, name: 'Uppalli, Chikkamagaluru' },
   'vijayapura': { latitude: 13.3210, longitude: 75.7820, name: 'Vijayapura, Chikkamagaluru' },
@@ -32,95 +33,183 @@ const DEFAULT_SHOPKEEPER_PHONES = [
   '+91 86601 20584'
 ];
 
-export async function fetchStores(customerLat = 13.3161, customerLon = 75.7720, localityName = '') {
-  if (!isSupabaseConfigured) {
-    return { stores: [], error: 'Supabase credentials not configured' };
-  }
-
-  try {
-    const { data: shopRows, error } = await supabase
-      .from('shops')
-      .select('*');
-
-    if (error || !shopRows || shopRows.length === 0) {
-      return { stores: [], error: null };
+// Helper to reliably resolve a store's geographic coordinates
+export function resolveStoreCoordinates(store) {
+  if (store.latitude != null && store.longitude != null) {
+    const lat = parseFloat(store.latitude);
+    const lon = parseFloat(store.longitude);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      return { latitude: lat, longitude: lon };
     }
-
-    // Only display stores that are approved by Admin and not pending/rejected
-    const approvedShopRows = shopRows.filter(s => {
-      const st = (s.status || '').toLowerCase();
-      if (st === 'pending' || st === 'pending_approval' || st === 'rejected' || s.is_approved === false) {
-        return false;
-      }
-      return true;
-    });
-
-    const liveStores = approvedShopRows.map((s, idx) => {
-      const addressLower = (s.address || '').toLowerCase();
-      let shopLat = s.latitude;
-      let shopLon = s.longitude;
-
-      if (shopLat == null || shopLon == null) {
-        for (const [key, coords] of Object.entries(LOCALITY_COORDINATES)) {
-          if (addressLower.includes(key)) {
-            shopLat = coords.latitude;
-            shopLon = coords.longitude;
-            break;
-          }
-        }
-      }
-
-      if (shopLat == null || shopLon == null) {
-        shopLat = customerLat + (idx * 0.006);
-        shopLon = customerLon + (idx * 0.005);
-      }
-
-      const distKm = calculateHaversineDistance(customerLat, customerLon, shopLat, shopLon);
-      const estMinutes = Math.max(10, Math.round(distKm * 6 + 12));
-
-      // Extract exact store phone number directly from Supabase shop record
-      const dbPhone = s.phone || s.shopkeeper_phone || s.owner_phone;
-      const shopkeeperPhone = dbPhone 
-        ? (dbPhone.startsWith('+') ? dbPhone : `+91 ${dbPhone.replace(/\D/g, '').slice(-10)}`)
-        : DEFAULT_SHOPKEEPER_PHONES[idx % DEFAULT_SHOPKEEPER_PHONES.length];
-
-      const isStoreOpen = s.is_open != null 
-        ? Boolean(s.is_open) 
-        : (s.status ? (s.status.toLowerCase() === 'open' || s.status.toLowerCase() === 'active') : true);
-      const statusText = isStoreOpen ? 'Open' : 'Closed';
-
-      return {
-        id: s.id,
-        name: s.name,
-        image: s.image_url || (idx % 2 === 0 ? '/images/store_lakshmi.jpg' : '/images/store_freshmart.jpg'),
-        rating: s.rating || 5.0,
-        reviews: s.reviews || (150 + idx * 45),
-        isOpen: isStoreOpen,
-        is_open: isStoreOpen,
-        status: statusText,
-        closingTime: s.closing_time || '10:00 PM',
-        openingTime: s.opening_time || '07:00 AM',
-        address: s.address || (localityName ? `Market Road, ${localityName}` : 'Chikkamagaluru, Karnataka'),
-        latitude: shopLat,
-        longitude: shopLon,
-        phone: shopkeeperPhone,
-        shopkeeperPhone: shopkeeperPhone,
-        categories: s.categories || ['Groceries', 'Dairy & Eggs', 'Rice & Grains', 'Cooking Essentials'],
-        distanceKm: distKm,
-        distance: `~${distKm} km away`,
-        deliveryTime: 'Delivery after 4:00 PM'
-      };
-    });
-
-    liveStores.sort((a, b) => a.distanceKm - b.distanceKm);
-    return { stores: liveStores, error: null };
-  } catch (err) {
-    console.error('Exception fetching shops:', err);
-    return { stores: [], error: 'Unable to load local stores. Please try again.' };
   }
+
+  const combinedText = `${store.locality || ''} ${store.city || ''} ${store.address || ''}`.toLowerCase();
+
+  for (const [key, coords] of Object.entries(LOCALITY_COORDINATES)) {
+    if (combinedText.includes(key)) {
+      return { latitude: coords.latitude, longitude: coords.longitude };
+    }
+  }
+
+  for (const loc of KNOWN_LOCALITY_LOOKUP) {
+    if (combinedText.includes(loc.area.toLowerCase()) || combinedText.includes(loc.city.toLowerCase())) {
+      return { latitude: loc.lat, longitude: loc.lon };
+    }
+  }
+
+  return { latitude: null, longitude: null };
 }
 
-// Create a new store in Supabase shops table (No owner_id field to prevent foreign key violations!)
+export async function fetchStores(customerLat = null, customerLon = null, localityName = '', cityName = '') {
+  let shopRows = [];
+
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('shops')
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        shopRows = data;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch error, using local stores fallback:', err);
+    }
+  }
+
+  // If no stores in Supabase, fall back to initial local stores
+  if (shopRows.length === 0) {
+    shopRows = STORES;
+  }
+
+  // Filter out stores pending approval or rejected
+  const approvedShopRows = shopRows.filter(s => {
+    const st = (s.status || '').toLowerCase();
+    if (st === 'pending' || st === 'pending_approval' || st === 'rejected' || s.is_approved === false) {
+      return false;
+    }
+    return true;
+  });
+
+  const parsedCustomerLat = customerLat != null ? parseFloat(customerLat) : null;
+  const parsedCustomerLon = customerLon != null ? parseFloat(customerLon) : null;
+  const hasCustomerCoords = parsedCustomerLat != null && !isNaN(parsedCustomerLat) && parsedCustomerLon != null && !isNaN(parsedCustomerLon);
+
+  // Map and calculate real distances for every store
+  const liveStores = approvedShopRows.map((s, idx) => {
+    const coords = resolveStoreCoordinates(s);
+    const shopLat = coords.latitude;
+    const shopLon = coords.longitude;
+
+    // Asynchronously backfill coordinates to Supabase if missing in database
+    if ((s.latitude == null || s.longitude == null) && shopLat != null && shopLon != null && isSupabaseConfigured && s.id && typeof s.id === 'string' && s.id.length > 20) {
+      supabase.from('shops').update({ latitude: shopLat, longitude: shopLon }).eq('id', s.id).catch?.(() => {});
+    }
+
+    let distKm = null;
+    let formattedDist = null;
+    let distanceBadge = 'Location required';
+
+    if (hasCustomerCoords && shopLat != null && shopLon != null) {
+      distKm = calculateHaversineDistance(parsedCustomerLat, parsedCustomerLon, shopLat, shopLon);
+      formattedDist = formatDistance(distKm);
+      distanceBadge = formattedDist ? `${formattedDist}` : 'Location required';
+    }
+
+    const dbPhone = s.phone || s.shopkeeper_phone || s.owner_phone;
+    const shopkeeperPhone = dbPhone 
+      ? (dbPhone.startsWith('+') ? dbPhone : `+91 ${dbPhone.replace(/\D/g, '').slice(-10)}`)
+      : DEFAULT_SHOPKEEPER_PHONES[idx % DEFAULT_SHOPKEEPER_PHONES.length];
+
+    const isStoreOpen = s.is_open != null 
+      ? Boolean(s.is_open) 
+      : (s.status ? (s.status.toLowerCase() === 'open' || s.status.toLowerCase() === 'active') : true);
+    const statusText = isStoreOpen ? 'Open' : 'Closed';
+
+    return {
+      id: s.id,
+      name: s.name,
+      image: s.image || s.image_url || (idx % 2 === 0 ? '/images/store_lakshmi.jpg' : '/images/store_freshmart.jpg'),
+      rating: s.rating || 4.8,
+      reviews: s.reviews || (150 + idx * 45),
+      isOpen: isStoreOpen,
+      is_open: isStoreOpen,
+      status: statusText,
+      closingTime: s.closing_time || '10:00 PM',
+      openingTime: s.opening_time || '07:00 AM',
+      address: s.address || (s.locality ? `${s.locality}, ${s.city || 'Karnataka'}` : 'Market Road, Chikkamagaluru'),
+      locality: s.locality || 'Local Area',
+      city: s.city || 'Chikkamagaluru',
+      state: s.state || 'Karnataka',
+      pincode: s.pincode || '',
+      latitude: shopLat,
+      longitude: shopLon,
+      phone: shopkeeperPhone,
+      shopkeeperPhone: shopkeeperPhone,
+      categories: s.categories || ['Groceries', 'Dairy & Eggs', 'Rice & Grains', 'Cooking Essentials'],
+      distanceKm: distKm,
+      formattedDistance: formattedDist,
+      distanceText: formattedDist ? `${formattedDist} away` : 'Location required',
+      distance: distanceBadge,
+      deliveryTime: 'Delivery after 4:00 PM'
+    };
+  });
+
+  // Locality Matching & Discovery Filter:
+  // If customer has a selected locality or coordinates, filter to relevant stores within delivery range (<= 45 km) or matching locality/city tokens
+  let matchedStores = liveStores;
+
+  const locQuery = `${localityName || ''} ${cityName || ''}`.toLowerCase().trim();
+  const searchTokens = locQuery.split(/[\s,/-]+/).filter(t => t.length > 2);
+
+  if (hasCustomerCoords) {
+    // 1. First find stores with real distance within 45 km radius OR matching locality/city tokens
+    const nearbyStores = liveStores.filter(store => {
+      // Direct distance proximity
+      if (store.distanceKm != null && store.distanceKm <= 45) {
+        return true;
+      }
+      // Locality / city text match
+      const storeText = `${store.locality} ${store.city} ${store.address}`.toLowerCase();
+      if (searchTokens.some(token => storeText.includes(token))) {
+        return true;
+      }
+      return false;
+    });
+
+    if (nearbyStores.length > 0) {
+      matchedStores = nearbyStores;
+    } else if (searchTokens.length > 0) {
+      // If none within 45km, only match if explicit locality match exists, otherwise return empty (no far-away stores)
+      matchedStores = liveStores.filter(store => {
+        const storeText = `${store.locality} ${store.city} ${store.address}`.toLowerCase();
+        return searchTokens.some(token => storeText.includes(token));
+      });
+    }
+  } else if (searchTokens.length > 0) {
+    const textMatched = liveStores.filter(store => {
+      const storeText = `${store.locality} ${store.city} ${store.address}`.toLowerCase();
+      return searchTokens.some(token => storeText.includes(token));
+    });
+    if (textMatched.length > 0) {
+      matchedStores = textMatched;
+    }
+  }
+
+  // Sort matched stores strictly by real geographic distance (Nearest First)
+  matchedStores.sort((a, b) => {
+    if (a.distanceKm != null && b.distanceKm != null) {
+      return a.distanceKm - b.distanceKm;
+    }
+    if (a.distanceKm != null) return -1;
+    if (b.distanceKm != null) return 1;
+    return 0;
+  });
+
+  return { stores: matchedStores, error: null };
+}
+
+// Create a new store in Supabase shops table
 export async function createStoreInSupabase(storeData, fallbackUser = null) {
   if (!isSupabaseConfigured) {
     return { data: null, error: 'Supabase is not configured' };
@@ -129,11 +218,22 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
   try {
     const storePhone = storeData.phone || storeData.shopkeeperPhone || '8123821300';
     const storeLocality = storeData.locality || (storeData.address?.split(',')[0]?.trim()) || 'Local Area';
-    const storeCity = storeData.city || (storeData.address?.split(',')[1]?.trim()) || 'Bengaluru';
+    const storeCity = storeData.city || (storeData.address?.split(',')[1]?.trim()) || 'Chikkamagaluru';
     const storeState = storeData.state || 'Karnataka';
-    const storePincode = storeData.pincode || '';
+    const storePincode = storeData.pincode || '577101';
 
-    // Pure store payload WITHOUT owner_id to avoid foreign key constraints!
+    // Resolve accurate coordinates
+    const coords = resolveStoreCoordinates({
+      latitude: storeData.latitude,
+      longitude: storeData.longitude,
+      locality: storeLocality,
+      city: storeCity,
+      address: storeData.address
+    });
+
+    const finalLat = coords.latitude != null ? coords.latitude : (storeCity.toLowerCase().includes('bengaluru') ? 12.9784 : 13.3161);
+    const finalLon = coords.longitude != null ? coords.longitude : (storeCity.toLowerCase().includes('bengaluru') ? 77.6408 : 75.7720);
+
     const payload = {
       name: storeData.name,
       phone: storePhone,
@@ -143,11 +243,10 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
       state: storeState,
       pincode: storePincode,
       password: storeData.password || null,
-      latitude: storeData.latitude != null ? parseFloat(storeData.latitude) : 12.9784,
-      longitude: storeData.longitude != null ? parseFloat(storeData.longitude) : 77.6408,
+      latitude: finalLat,
+      longitude: finalLon,
       rating: 5.0,
       is_open: false,
-      is_approved: false,
       status: 'pending_approval',
       image_url: storeData.image || storeData.image_url || '/images/store_lakshmi.jpg'
     };
@@ -169,8 +268,8 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
         city: storeCity,
         state: storeState,
         pincode: storePincode,
-        latitude: storeData.latitude != null ? parseFloat(storeData.latitude) : 12.9784,
-        longitude: storeData.longitude != null ? parseFloat(storeData.longitude) : 77.6408,
+        latitude: finalLat,
+        longitude: finalLon,
         status: 'pending_approval',
         is_open: false,
         image_url: storeData.image || storeData.image_url || '/images/store_lakshmi.jpg'
@@ -229,8 +328,23 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
       .update(payload)
       .eq('id', storeId);
 
-    return !error;
-  } catch {
+    if (error) {
+      console.warn('Supabase store update error, retrying with minimal payload:', error.message);
+      const minimalPayload = {};
+      if (updatedFields.isOpen != null) {
+        minimalPayload.is_open = Boolean(updatedFields.isOpen);
+        minimalPayload.status = updatedFields.isOpen ? 'open' : 'closed';
+      }
+      const { error: err2 } = await supabase
+        .from('shops')
+        .update(minimalPayload)
+        .eq('id', storeId);
+      return !err2;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Exception updating store in Supabase:', err);
     return false;
   }
 }

@@ -21,13 +21,16 @@ export default function Footer() {
           
           {/* BRAND COLUMN */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center text-emerald-950 font-bold">
-                <Leaf className="w-6 h-6 stroke-[2.5]" />
-              </div>
-              <span className="font-display font-black text-2xl text-white tracking-tight">
-                Ghar<span className="text-emerald-400">See</span>
-              </span>
+            <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('home')}>
+              <img 
+                src="/ur-grozy-logo.png" 
+                alt="UR GROZY" 
+                className="h-10 sm:h-12 w-auto object-contain hover:scale-105 transition-transform duration-200"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/logo.png';
+                }}
+              />
             </div>
 
             <p className="text-emerald-100/70 text-xs sm:text-sm max-w-sm leading-relaxed">
@@ -108,7 +111,7 @@ export default function Footer() {
 
         {/* BOTTOM COPYRIGHT */}
         <div className="pt-8 border-t border-emerald-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-400">
-          <p>© {new Date().getFullYear()} GharSee Technologies Pvt Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} UR GROZY Technologies Pvt Ltd. All rights reserved.</p>
           <div className="flex items-center gap-4 text-stone-400 text-xs">
             <span>UPI</span>
             <span>GPay</span>

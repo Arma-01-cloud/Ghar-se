@@ -82,23 +82,28 @@ export default function ShopkeeperLogin() {
       <div className="w-full max-w-md mx-auto bg-white rounded-3xl border border-stone-200 p-8 shadow-xl space-y-6 my-auto">
         
         {/* BRAND LOGO & TITLE */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-3xl bg-emerald-800 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/20">
-            <Leaf className="w-8 h-8 stroke-[2.5]" />
+        <div className="text-center space-y-3">
+          <div className="flex justify-center pb-1">
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-12 sm:h-14 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
           </div>
           
           <div>
-            <span className="font-display font-black text-2xl text-stone-900 tracking-tight block">
-              Ghar<span className="text-emerald-600">See</span> Store Partner
-            </span>
-            <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider">
-              {mode === 'signup' ? 'NEW PARTNER REGISTRATION' : 'PARTNER PORTAL LOGIN'}
+            <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider block">
+              {mode === 'signup' ? 'NEW STORE PARTNER REGISTRATION' : 'STORE PARTNER PORTAL LOGIN'}
             </span>
           </div>
 
-          <p className="text-stone-500 text-xs sm:text-sm pt-1">
+          <p className="text-stone-500 text-xs sm:text-sm pt-0.5">
             {mode === 'signup' 
-              ? 'Register your store on GharSee using your mobile number and password.'
+              ? 'Register your store on UR GROZY using your mobile number and password.'
               : 'Sign in with your mobile number and password to manage your store.'
             }
           </p>
@@ -273,7 +278,7 @@ export default function ShopkeeperLogin() {
       </div>
 
       <div className="text-center text-xs text-stone-400 font-semibold py-4">
-        © {new Date().getFullYear()} GharSee Store Partner Portal. All rights reserved.
+        © {new Date().getFullYear()} UR GROZY Store Partner Portal. All rights reserved.
       </div>
 
     </div>

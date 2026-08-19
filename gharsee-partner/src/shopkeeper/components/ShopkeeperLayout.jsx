@@ -37,7 +37,7 @@ class ShopkeeperErrorBoundary extends Component {
             <AlertCircle className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h2 className="font-display font-extrabold text-2xl text-stone-900">GharSee Store Partner Portal</h2>
+            <h2 className="font-display font-extrabold text-2xl text-stone-900">UR GROZY Store Partner Portal</h2>
             <p className="text-stone-500 text-xs sm:text-sm max-w-md mx-auto">
               Connecting to Supabase marketplace directory. Click below to refresh your shopkeeper session.
             </p>
@@ -100,12 +100,18 @@ function ShopkeeperLayoutInner() {
     return (
       <div className="min-h-screen bg-[#FBF9F5] flex flex-col justify-between text-stone-900 font-sans">
         <header className="bg-white border-b border-stone-200 py-4 px-6 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-800 flex items-center justify-center text-white font-black text-sm">
-              <Store className="w-5 h-5" />
-            </div>
-            <span className="font-display font-black text-xl text-stone-900">
-              GharSee <span className="text-emerald-700 font-extrabold">Store Partner</span>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-8 sm:h-9 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
+            <span className="text-emerald-700 font-extrabold text-xs sm:text-sm uppercase tracking-wider">
+              Store Partner
             </span>
           </div>
           <span className="bg-amber-100 text-amber-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
@@ -118,7 +124,7 @@ function ShopkeeperLayoutInner() {
         </main>
 
         <footer className="bg-white border-t border-stone-200 py-4 px-6 text-center text-xs text-stone-500">
-          © {new Date().getFullYear()} GharSee Marketplace Technologies • Partner Onboarding Portal
+          © {new Date().getFullYear()} UR GROZY Marketplace Technologies • Partner Onboarding Portal
         </footer>
 
         <ShopkeeperToastContainer />

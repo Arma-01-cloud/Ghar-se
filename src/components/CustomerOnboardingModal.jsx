@@ -167,11 +167,19 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
       >
         {/* HEADER */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-inner">
-            <ShoppingBag className="w-7 h-7 text-emerald-700" />
+          <div className="flex justify-center pb-1">
+            <img 
+              src="/ur-grozy-logo.png" 
+              alt="UR GROZY" 
+              className="h-12 sm:h-14 w-auto object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/logo.png';
+              }}
+            />
           </div>
           <h2 className="font-display font-black text-2xl sm:text-3xl text-stone-900">
-            Welcome to Ghar See 🛒
+            Welcome to UR GROZY 🛒
           </h2>
           <p className="text-stone-500 text-xs sm:text-sm max-w-sm mx-auto">
             Please enter your name, phone number & location to view local grocery stores.
