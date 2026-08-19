@@ -85,8 +85,8 @@ export async function signUpUserWithPhone({
 
     // 3. Create store in Supabase shops table (WITHOUT owner_id to prevent FK errors!)
     if (role === 'shopkeeper') {
-      const shopLocality = locality || 'Indiranagar';
-      const shopCity = city || 'Bengaluru';
+      const shopLocality = locality || 'Uppalli';
+      const shopCity = city || 'Chikkamagaluru';
       const shopState = state || 'Karnataka';
       const shopAddress = address || `${shopLocality}, ${shopCity}, ${shopState}${pincode ? ' - ' + pincode : ''}`;
 
@@ -100,11 +100,11 @@ export async function signUpUserWithPhone({
           locality: shopLocality,
           city: shopCity,
           state: shopState,
-          pincode: pincode || '',
-          latitude: latitude != null ? parseFloat(latitude) : 12.9784,
-          longitude: longitude != null ? parseFloat(longitude) : 77.6408,
+          pincode: pincode || '577101',
+          latitude: latitude != null ? parseFloat(latitude) : 13.3284,
+          longitude: longitude != null ? parseFloat(longitude) : 75.7578,
           status: 'pending_approval',
-          is_open: false,
+          is_open: true,
           is_approved: false,
           image_url: imageUrl || '/images/store_lakshmi.jpg'
         }])

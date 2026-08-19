@@ -21,15 +21,21 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
   const [errorMsg, setErrorMsg] = useState('');
 
   const PRESET_LOCALITIES = [
-    { name: 'Chikkamagaluru, Karnataka', latitude: 13.3161, longitude: 75.7720, label: 'Chikkamagaluru' },
-    { name: 'Indiranagar, Bengaluru', latitude: 12.9784, longitude: 77.6408, label: 'Indiranagar' },
-    { name: 'Koramangala, Bengaluru', latitude: 12.9352, longitude: 77.6245, label: 'Koramangala' },
-    { name: 'HAL 2nd Stage, Bengaluru', latitude: 12.9620, longitude: 77.6580, label: 'HAL 2nd Stage' },
-    { name: 'HSR Layout, Bengaluru', latitude: 12.9121, longitude: 77.6446, label: 'HSR Layout' },
-    { name: 'Whitefield, Bengaluru', latitude: 12.9698, longitude: 77.7500, label: 'Whitefield' },
-    { name: 'MG Road, Bengaluru', latitude: 12.9756, longitude: 77.6066, label: 'MG Road' },
-    { name: 'Mysuru, Karnataka', latitude: 12.2958, longitude: 76.6394, label: 'Mysuru' },
-    { name: 'Mangaluru, Karnataka', latitude: 12.9141, longitude: 74.8560, label: 'Mangaluru' }
+    { name: 'Uppalli, Chikkamagaluru', latitude: 13.3284, longitude: 75.7578, label: 'Uppalli', area: 'Uppalli', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Vijayapura, Chikkamagaluru', latitude: 13.3210, longitude: 75.7820, label: 'Vijayapura', area: 'Vijayapura', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Market Road, Chikkamagaluru', latitude: 13.3161, longitude: 75.7720, label: 'Market Road / IG Road', area: 'Market Road', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'MG Road, Chikkamagaluru', latitude: 13.3175, longitude: 75.7725, label: 'MG Road', area: 'MG Road', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Rathnagiri Road, Chikkamagaluru', latitude: 13.3245, longitude: 75.7780, label: 'Rathnagiri Road', area: 'Rathnagiri Road', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'KM Road, Chikkamagaluru', latitude: 13.3280, longitude: 75.7650, label: 'KM Road', area: 'KM Road', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Basavanahalli, Chikkamagaluru', latitude: 13.3180, longitude: 75.7760, label: 'Basavanahalli', area: 'Basavanahalli', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Shankarpura, Chikkamagaluru', latitude: 13.3140, longitude: 75.7680, label: 'Shankarpura', area: 'Shankarpura', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Kalyan Nagar, Chikkamagaluru', latitude: 13.3315, longitude: 75.7830, label: 'Kalyan Nagar', area: 'Kalyan Nagar', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Housing Board Colony, Chikkamagaluru', latitude: 13.3340, longitude: 75.7710, label: 'Housing Board Colony', area: 'Housing Board Colony', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Jyothi Nagar, Chikkamagaluru', latitude: 13.3320, longitude: 75.7610, label: 'Jyothi Nagar', area: 'Jyothi Nagar', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Dantaramakki, Chikkamagaluru', latitude: 13.3260, longitude: 75.7920, label: 'Dantaramakki', area: 'Dantaramakki', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Ramanahalli, Chikkamagaluru', latitude: 13.3080, longitude: 75.7850, label: 'Ramanahalli', area: 'Ramanahalli', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Bus Stand Road, Chikkamagaluru', latitude: 13.3195, longitude: 75.7745, label: 'Bus Stand Road', area: 'Bus Stand Road', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' },
+    { name: 'Naidu Street, Chikkamagaluru', latitude: 13.3170, longitude: 75.7740, label: 'Naidu Street', area: 'Naidu Street', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101' }
   ];
 
   // Auto-search Supabase database whenever phone number reaches 10 digits
@@ -49,8 +55,12 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
           if (customerData.address_text) {
             setSelectedLocality({
               name: customerData.address_text || `${customerData.street || ''}, ${customerData.city || 'Chikkamagaluru'}`.trim(),
-              latitude: customerData.latitude ? parseFloat(customerData.latitude) : 13.3161,
-              longitude: customerData.longitude ? parseFloat(customerData.longitude) : 75.7720
+              area: customerData.street || 'Uppalli',
+              city: customerData.city || 'Chikkamagaluru',
+              state: 'Karnataka',
+              pincode: customerData.pincode || '577101',
+              latitude: customerData.latitude ? parseFloat(customerData.latitude) : 13.3284,
+              longitude: customerData.longitude ? parseFloat(customerData.longitude) : 75.7578
             });
           }
         } else {
@@ -78,20 +88,25 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
       const result = await getCurrentPositionWithAddress();
       setIsDetectingGPS(false);
       const gpsLoc = {
-        name: result.name,
-        area: result.area,
-        district: result.district,
-        city: result.city,
-        state: result.state,
-        pincode: result.pincode,
-        formattedAddress: result.formattedAddress,
-        latitude: result.latitude,
-        longitude: result.longitude
+        name: result.name || `${result.area || 'Uppalli'}, Chikkamagaluru`,
+        area: result.area || 'Uppalli',
+        district: result.district || 'Chikkamagaluru',
+        city: result.city || 'Chikkamagaluru',
+        state: result.state || 'Karnataka',
+        pincode: result.pincode || '577101',
+        formattedAddress: result.formattedAddress || `${result.area || 'Uppalli'}, Chikkamagaluru, Karnataka - 577101`,
+        latitude: result.latitude || 13.3284,
+        longitude: result.longitude || 75.7578
       };
       setSelectedLocality(gpsLoc);
     } catch (err) {
       setIsDetectingGPS(false);
-      setErrorMsg(err.message || 'Unable to detect GPS location. Please select manually below.');
+      if (err?.code === 'PERMISSION_DENIED') {
+        setErrorMsg('Location permission is disabled in browser. Please select your area below or allow location access in browser settings.');
+      } else {
+        // Safe graceful fallback to Uppalli, Chikkamagaluru without crashing
+        setSelectedLocality(PRESET_LOCALITIES[0]);
+      }
     }
   };
 
@@ -132,10 +147,10 @@ export default function CustomerOnboardingModal({ isOpen, onClose }) {
       fullName: nameVal,
       addressText: selectedLocality.formattedAddress || selectedLocality.name,
       area: selectedLocality.area,
-      district: selectedLocality.district,
-      city: selectedLocality.city || (selectedLocality.name.includes(',') ? selectedLocality.name.split(',')[1].trim() : 'Bengaluru'),
-      state: selectedLocality.state,
-      pincode: selectedLocality.pincode,
+      district: selectedLocality.district || 'Chikkamagaluru',
+      city: selectedLocality.city || 'Chikkamagaluru',
+      state: selectedLocality.state || 'Karnataka',
+      pincode: selectedLocality.pincode || '577101',
       latitude: selectedLocality.latitude,
       longitude: selectedLocality.longitude
     });

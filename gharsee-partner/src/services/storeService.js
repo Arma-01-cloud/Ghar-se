@@ -4,18 +4,25 @@ import { generateUUID } from './authService';
 
 // Extensible Locality Coordinates Mapping
 const LOCALITY_COORDINATES = {
+  'uppalli': { latitude: 13.3284, longitude: 75.7578, name: 'Uppalli, Chikkamagaluru' },
+  'vijayapura': { latitude: 13.3210, longitude: 75.7820, name: 'Vijayapura, Chikkamagaluru' },
+  'market road': { latitude: 13.3161, longitude: 75.7720, name: 'Market Road, Chikkamagaluru' },
+  'ig road': { latitude: 13.3161, longitude: 75.7720, name: 'IG Road, Chikkamagaluru' },
+  'mg road': { latitude: 13.3175, longitude: 75.7725, name: 'MG Road, Chikkamagaluru' },
+  'rathnagiri': { latitude: 13.3245, longitude: 75.7780, name: 'Rathnagiri Road, Chikkamagaluru' },
+  'km road': { latitude: 13.3280, longitude: 75.7650, name: 'KM Road, Chikkamagaluru' },
+  'basavanahalli': { latitude: 13.3180, longitude: 75.7760, name: 'Basavanahalli, Chikkamagaluru' },
+  'shankarpura': { latitude: 13.3140, longitude: 75.7680, name: 'Shankarpura, Chikkamagaluru' },
+  'kalyan nagar': { latitude: 13.3315, longitude: 75.7830, name: 'Kalyan Nagar, Chikkamagaluru' },
+  'housing board': { latitude: 13.3340, longitude: 75.7710, name: 'Housing Board Colony, Chikkamagaluru' },
+  'khb': { latitude: 13.3340, longitude: 75.7710, name: 'Housing Board Colony, Chikkamagaluru' },
+  'jyothi nagar': { latitude: 13.3320, longitude: 75.7610, name: 'Jyothi Nagar, Chikkamagaluru' },
+  'dantaramakki': { latitude: 13.3260, longitude: 75.7920, name: 'Dantaramakki, Chikkamagaluru' },
+  'ramanahalli': { latitude: 13.3080, longitude: 75.7850, name: 'Ramanahalli, Chikkamagaluru' },
+  'bus stand': { latitude: 13.3195, longitude: 75.7745, name: 'Bus Stand Road, Chikkamagaluru' },
+  'naidu street': { latitude: 13.3170, longitude: 75.7740, name: 'Naidu Street, Chikkamagaluru' },
   'chikkamagaluru': { latitude: 13.3161, longitude: 75.7720, name: 'Chikkamagaluru, Karnataka' },
-  'chikmagalur': { latitude: 13.3161, longitude: 75.7720, name: 'Chikkamagaluru, Karnataka' },
-  'bengaluru': { latitude: 12.9716, longitude: 77.5946, name: 'Bengaluru, Karnataka' },
-  'indiranagar': { latitude: 12.9784, longitude: 77.6408, name: 'Indiranagar, Bengaluru' },
-  'koramangala': { latitude: 12.9352, longitude: 77.6245, name: 'Koramangala, Bengaluru' },
-  'hal': { latitude: 12.9620, longitude: 77.6580, name: 'HAL 2nd Stage, Bengaluru' },
-  'whitefield': { latitude: 12.9698, longitude: 77.7500, name: 'Whitefield, Bengaluru' },
-  'hsr layout': { latitude: 12.9121, longitude: 77.6446, name: 'HSR Layout, Bengaluru' },
-  'mg road': { latitude: 12.9756, longitude: 77.6066, name: 'MG Road, Bengaluru' },
-  'mysuru': { latitude: 12.2958, longitude: 76.6394, name: 'Mysuru, Karnataka' },
-  'mangaluru': { latitude: 12.9141, longitude: 74.8560, name: 'Mangaluru, Karnataka' },
-  'hubballi': { latitude: 15.3647, longitude: 75.1240, name: 'Hubballi, Karnataka' }
+  'chikmagalur': { latitude: 13.3161, longitude: 75.7720, name: 'Chikkamagaluru, Karnataka' }
 };
 
 const DEFAULT_SHOPKEEPER_PHONES = [

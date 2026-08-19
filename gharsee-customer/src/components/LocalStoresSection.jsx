@@ -20,7 +20,7 @@ export default function LocalStoresSection() {
           </div>
           <div>
             <span className="text-[11px] text-emerald-300 uppercase tracking-wider font-extrabold block">Deliver To</span>
-            <p className="font-extrabold text-sm text-white">{currentLocation?.name || 'Indiranagar, Bengaluru'}</p>
+            <p className="font-extrabold text-sm text-white">{currentLocation?.name || 'Uppalli, Chikkamagaluru'}</p>
           </div>
         </div>
 

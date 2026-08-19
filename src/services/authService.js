@@ -87,8 +87,8 @@ export async function signUpUserWithPhone({
 
     // 3. Create store in Supabase shops table (WITHOUT owner_id to prevent FK errors!)
     if (role === 'shopkeeper') {
-      const shopLocality = locality || 'Indiranagar';
-      const shopCity = city || 'Bengaluru';
+      const shopLocality = locality || 'Uppalli';
+      const shopCity = city || 'Chikkamagaluru';
       const shopState = state || 'Karnataka';
       const shopAddress = address || `${shopLocality}, ${shopCity}, ${shopState}${pincode ? ' - ' + pincode : ''}`;
 

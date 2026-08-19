@@ -1,83 +1,179 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { get10DigitPhone } from './authService';
 
-// Calculate Geographic Distance using Haversine Formula (Returns distance in kilometers)
+// Calculate Geographic Distance using Haversine Formula (Returns distance in kilometers or null if unavailable)
 export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
-    return 1.5; // Default distance fallback
+    return null;
+  }
+
+  const nLat1 = parseFloat(lat1);
+  const nLon1 = parseFloat(lon1);
+  const nLat2 = parseFloat(lat2);
+  const nLon2 = parseFloat(lon2);
+
+  if (isNaN(nLat1) || isNaN(nLon1) || isNaN(nLat2) || isNaN(nLon2)) {
+    return null;
   }
 
   const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const dLat = (nLat2 - nLat1) * (Math.PI / 180);
+  const dLon = (nLon2 - nLon1) * (Math.PI / 180);
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
+    Math.cos(nLat1 * (Math.PI / 180)) *
+      Math.cos(nLat2 * (Math.PI / 180)) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
 
-  return Math.round(distance * 10) / 10; // Round to 1 decimal place
+  return Math.round(distance * 100) / 100; // Exact distance in km with high precision
 }
 
-// Browser Geolocation API wrapper with Promise & Error handling
-export function getCurrentPositionCoordinates() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject({ code: 'NOT_SUPPORTED', message: 'Location services are currently unavailable in your browser.' });
-      return;
-    }
+// Format distance cleanly: <1 km displayed in meters, >=1 km displayed in km with 1 decimal precision
+export function formatDistance(distanceKm) {
+  if (distanceKm == null || isNaN(distanceKm) || distanceKm < 0) {
+    return null;
+  }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy
-        });
-      },
-      (error) => {
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            reject({ code: 'PERMISSION_DENIED', message: 'Location permission is required to find stores near you. Please enable location in your browser settings.' });
-            break;
-          case error.POSITION_UNAVAILABLE:
-            reject({ code: 'POSITION_UNAVAILABLE', message: 'GPS location is currently unavailable.' });
-            break;
-          case error.TIMEOUT:
-            reject({ code: 'TIMEOUT', message: 'Location detection timed out. Please try again or search manually.' });
-            break;
-          default:
-            reject({ code: 'UNKNOWN_ERROR', message: 'Unable to detect location. Please select your area manually.' });
-            break;
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000
+  const num = parseFloat(distanceKm);
+  if (isNaN(num)) return null;
+
+  if (num < 1) {
+    // Meters format: rounded to nearest meter (e.g. 350 m, 800 m, 850 m)
+    const meters = Math.round(num * 1000);
+    return `${meters} m`;
+  }
+
+  if (num < 100) {
+    // Kilometers format with 1 decimal precision (e.g. 1.2 km, 3.7 km, 12.4 km)
+    return `${num.toFixed(1)} km`;
+  }
+
+  return `${Math.round(num)} km`;
+}
+
+// Helper for fast IP-based coordinate fallback when GPS sensors are delayed or indoors
+async function getIpOrFallbackCoordinates() {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client', {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude != null && data.longitude != null) {
+        return {
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
+          accuracy: 500
+        };
       }
-    );
-  });
+    }
+  } catch {
+    // Fallthrough to default
+  }
+
+  return {
+    latitude: 13.3284,
+    longitude: 75.7578,
+    accuracy: 100
+  };
 }
 
-// Comprehensive Reference Localities table for instant offline fallback
-const KNOWN_LOCALITY_LOOKUP = [
-  { name: 'Indiranagar, Bengaluru', area: 'Indiranagar', district: 'Bengaluru Urban', city: 'Bengaluru', state: 'Karnataka', pincode: '560038', lat: 12.9784, lon: 77.6408 },
-  { name: 'Koramangala, Bengaluru', area: 'Koramangala', district: 'Bengaluru Urban', city: 'Bengaluru', state: 'Karnataka', pincode: '560034', lat: 12.9352, lon: 77.6245 },
-  { name: 'Whitefield, Bengaluru', area: 'Whitefield', district: 'Bengaluru Urban', city: 'Bengaluru', state: 'Karnataka', pincode: '560066', lat: 12.9698, lon: 77.7500 },
-  { name: 'HSR Layout, Bengaluru', area: 'HSR Layout', district: 'Bengaluru Urban', city: 'Bengaluru', state: 'Karnataka', pincode: '560102', lat: 12.9121, lon: 77.6446 },
-  { name: 'HAL 2nd Stage, Bengaluru', area: 'HAL 2nd Stage', district: 'Bengaluru Urban', city: 'Bengaluru', state: 'Karnataka', pincode: '560008', lat: 12.9620, lon: 77.6580 },
-  { name: 'MG Road, Bengaluru', area: 'MG Road / Central Bengaluru', district: 'Bengaluru Urban', city: 'Bengaluru', state: 'Karnataka', pincode: '560001', lat: 12.9756, lon: 77.6066 },
+// Browser Geolocation API wrapper with Progressive Multi-tier Fallback & Error handling
+export async function getCurrentPositionCoordinates() {
+  if (!navigator.geolocation) {
+    return await getIpOrFallbackCoordinates();
+  }
+
+  // 1. Try Browser Geolocation with High Accuracy (fast 5-second attempt)
+  try {
+    const highAccPosition = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        }),
+        (err) => reject(err),
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 60000
+        }
+      );
+    });
+    return highAccPosition;
+  } catch (highAccError) {
+    // If user explicitly denied permission, throw clear error
+    if (highAccError?.code === 1) {
+      throw { code: 'PERMISSION_DENIED', message: 'Location permission was denied. Please select your area manually below or enable permission in browser settings.' };
+    }
+    // For TIMEOUT (code 3) or POSITION_UNAVAILABLE (code 2), smoothly attempt network/cell-tower location
+  }
+
+  // 2. Try Browser Geolocation with Standard Accuracy (Faster, works indoors & on mobile network)
+  try {
+    const stdPosition = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        }),
+        (err) => reject(err),
+        {
+          enableHighAccuracy: false,
+          timeout: 7000,
+          maximumAge: 300000 // Accept 5-minute cached network location
+        }
+      );
+    });
+    return stdPosition;
+  } catch (stdError) {
+    if (stdError?.code === 1) {
+      throw { code: 'PERMISSION_DENIED', message: 'Location permission was denied. Please select your area manually below or enable permission in browser settings.' };
+    }
+  }
+
+  // 3. Fallback to IP Geolocation if GPS hardware is not responding / timed out
+  try {
+    const ipCoords = await getIpOrFallbackCoordinates();
+    return ipCoords;
+  } catch {
+    // 4. Default to Chikkamagaluru (Uppalli)
+    return {
+      latitude: 13.3284,
+      longitude: 75.7578,
+      accuracy: 100
+    };
+  }
+}
+
+// Comprehensive Reference Localities table for instant offline fallback (Chikkamagaluru focused)
+export const KNOWN_LOCALITY_LOOKUP = [
+  { name: 'Uppalli, Chikkamagaluru', area: 'Uppalli', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3284, lon: 75.7578 },
+  { name: 'Vijayapura, Chikkamagaluru', area: 'Vijayapura', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3210, lon: 75.7820 },
   { name: 'Market Road, Chikkamagaluru', area: 'Market Road / IG Road', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3161, lon: 75.7720 },
+  { name: 'MG Road, Chikkamagaluru', area: 'MG Road', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3175, lon: 75.7725 },
   { name: 'Rathnagiri Road, Chikkamagaluru', area: 'Rathnagiri Road', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3245, lon: 75.7780 },
-  { name: 'Jayachamarajendra Nagar, Mysuru', area: 'JC Nagar', district: 'Mysuru', city: 'Mysuru', state: 'Karnataka', pincode: '570010', lat: 12.2958, lon: 76.6394 },
-  { name: 'Hampankatta, Mangaluru', area: 'Hampankatta', district: 'Dakshina Kannada', city: 'Mangaluru', state: 'Karnataka', pincode: '575001', lat: 12.9141, lon: 74.8560 },
-  { name: 'Vidyanagar, Hubballi', area: 'Vidyanagar', district: 'Dharwad', city: 'Hubballi', state: 'Karnataka', pincode: '580021', lat: 15.3647, lon: 75.1240 }
+  { name: 'KM Road, Chikkamagaluru', area: 'KM Road', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3280, lon: 75.7650 },
+  { name: 'Basavanahalli, Chikkamagaluru', area: 'Basavanahalli', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3180, lon: 75.7760 },
+  { name: 'Shankarpura, Chikkamagaluru', area: 'Shankarpura', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3140, lon: 75.7680 },
+  { name: 'Kalyan Nagar, Chikkamagaluru', area: 'Kalyan Nagar', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3315, lon: 75.7830 },
+  { name: 'Housing Board Colony, Chikkamagaluru', area: 'Housing Board Colony', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3340, lon: 75.7710 },
+  { name: 'Jyothi Nagar, Chikkamagaluru', area: 'Jyothi Nagar', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3320, lon: 75.7610 },
+  { name: 'Dantaramakki, Chikkamagaluru', area: 'Dantaramakki', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3260, lon: 75.7920 },
+  { name: 'Ramanahalli, Chikkamagaluru', area: 'Ramanahalli', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3080, lon: 75.7850 },
+  { name: 'Bus Stand Road, Chikkamagaluru', area: 'Bus Stand Road', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3195, lon: 75.7745 },
+  { name: 'Naidu Street, Chikkamagaluru', area: 'Naidu Street', district: 'Chikkamagaluru', city: 'Chikkamagaluru', state: 'Karnataka', pincode: '577101', lat: 13.3170, lon: 75.7740 }
 ];
 
 function getNearestKnownLocality(lat, lon) {
@@ -87,7 +183,7 @@ function getNearestKnownLocality(lat, lon) {
   for (let i = 1; i < KNOWN_LOCALITY_LOOKUP.length; i++) {
     const loc = KNOWN_LOCALITY_LOOKUP[i];
     const dist = calculateHaversineDistance(lat, lon, loc.lat, loc.lon);
-    if (dist < minDistance) {
+    if (dist != null && (minDistance == null || dist < minDistance)) {
       minDistance = dist;
       best = loc;
     }
@@ -101,8 +197,8 @@ function getNearestKnownLocality(lat, lon) {
     state: best.state,
     pincode: best.pincode,
     formattedAddress: `${best.area}, ${best.city}, ${best.state} - ${best.pincode}`,
-    latitude: lat,
-    longitude: lon
+    latitude: lat || best.lat,
+    longitude: lon || best.lon
   };
 }
 
@@ -112,10 +208,16 @@ export async function reverseGeocodeCoordinates(lat, lon) {
     return KNOWN_LOCALITY_LOOKUP[0];
   }
 
+  // If coordinates are within Chikkamagaluru region (~15km radius), snap to nearest known Chikkamagaluru area
+  const dToChik = calculateHaversineDistance(lat, lon, 13.3161, 75.7720);
+  if (dToChik != null && dToChik < 15) {
+    return getNearestKnownLocality(lat, lon);
+  }
+
   // 1. Try BigDataCloud Reverse Geocoding Client API (Fast, Free, CORS enabled)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     const bdcRes = await fetch(
       `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,
       { signal: controller.signal }
@@ -124,9 +226,9 @@ export async function reverseGeocodeCoordinates(lat, lon) {
 
     if (bdcRes.ok) {
       const data = await bdcRes.json();
-      const area = data.locality || data.localityInfo?.administrative?.[3]?.name || data.localityInfo?.administrative?.[2]?.name || data.city || '';
-      const district = data.localityInfo?.administrative?.[2]?.name || data.principalSubdivision || data.city || 'District';
-      const city = data.city || data.locality || district;
+      const area = data.locality || data.localityInfo?.administrative?.[3]?.name || data.localityInfo?.administrative?.[2]?.name || data.city || 'Uppalli';
+      const district = data.localityInfo?.administrative?.[2]?.name || data.principalSubdivision || data.city || 'Chikkamagaluru';
+      const city = data.city || data.locality || district || 'Chikkamagaluru';
       const state = data.principalSubdivision || 'Karnataka';
       const pincode = data.postcode || '577101';
 
@@ -139,9 +241,9 @@ export async function reverseGeocodeCoordinates(lat, lon) {
 
       return {
         name: shortTitle,
-        area: cleanArea || cleanCity,
-        district: cleanDistrict || cleanCity,
-        city: cleanCity,
+        area: cleanArea || cleanCity || 'Uppalli',
+        district: cleanDistrict || cleanCity || 'Chikkamagaluru',
+        city: cleanCity || 'Chikkamagaluru',
         state: state,
         pincode: pincode,
         formattedAddress: fullAddr,
@@ -156,7 +258,7 @@ export async function reverseGeocodeCoordinates(lat, lon) {
   // 2. Try OpenStreetMap Nominatim Reverse Geocoding
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     const osmRes = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,
       {
@@ -169,8 +271,8 @@ export async function reverseGeocodeCoordinates(lat, lon) {
     if (osmRes.ok) {
       const data = await osmRes.json();
       const addr = data.address || {};
-      const area = addr.suburb || addr.neighbourhood || addr.residential || addr.road || addr.village || addr.town || addr.hamlet || '';
-      const district = addr.state_district || addr.county || addr.city_district || addr.city || '';
+      const area = addr.suburb || addr.neighbourhood || addr.residential || addr.road || addr.village || addr.town || addr.hamlet || 'Uppalli';
+      const district = addr.state_district || addr.county || addr.city_district || addr.city || 'Chikkamagaluru';
       const city = addr.city || addr.town || addr.municipality || district || 'Chikkamagaluru';
       const state = addr.state || 'Karnataka';
       const pincode = addr.postcode || '577101';
@@ -180,9 +282,9 @@ export async function reverseGeocodeCoordinates(lat, lon) {
 
       return {
         name: shortName,
-        area: area || city,
-        district: district || city,
-        city: city,
+        area: area || city || 'Uppalli',
+        district: district || city || 'Chikkamagaluru',
+        city: city || 'Chikkamagaluru',
         state: state,
         pincode: pincode,
         formattedAddress: fullAddr || shortName,
@@ -206,7 +308,7 @@ export async function searchLocationPlaces(query) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', India')}&addressdetails=1&limit=6&countrycodes=in`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Chikkamagaluru, Karnataka, India')}&addressdetails=1&limit=6&countrycodes=in`,
       {
         signal: controller.signal,
         headers: { 'Accept-Language': 'en' }
@@ -220,10 +322,10 @@ export async function searchLocationPlaces(query) {
         return list.map(item => {
           const addr = item.address || {};
           const area = addr.suburb || addr.neighbourhood || addr.residential || addr.road || addr.village || addr.town || item.name || '';
-          const city = addr.city || addr.town || addr.municipality || addr.state_district || 'City';
+          const city = addr.city || addr.town || addr.municipality || addr.state_district || 'Chikkamagaluru';
           const state = addr.state || 'Karnataka';
-          const district = addr.state_district || addr.county || city;
-          const pincode = addr.postcode || '';
+          const district = addr.state_district || addr.county || 'Chikkamagaluru';
+          const pincode = addr.postcode || '577101';
 
           const title = area ? `${area}, ${city}` : (item.name || `${city}, ${state}`);
 
@@ -275,6 +377,69 @@ export async function getCurrentPositionWithAddress() {
   };
 }
 
+// Robust Address to Geographic Coordinates Resolver
+export function resolveAddressCoordinates(addressText = '', area = '', city = '') {
+  const combined = `${addressText || ''} ${area || ''} ${city || ''}`.toLowerCase();
+
+  if (combined.includes('uppalli')) {
+    return { latitude: 13.3284, longitude: 75.7578, city: 'Chikkamagaluru', area: 'Uppalli' };
+  }
+  if (combined.includes('vijayapura') || combined.includes('vijaypur')) {
+    return { latitude: 13.3210, longitude: 75.7820, city: 'Chikkamagaluru', area: 'Vijayapura' };
+  }
+  if (combined.includes('rathnagiri')) {
+    return { latitude: 13.3245, longitude: 75.7780, city: 'Chikkamagaluru', area: 'Rathnagiri Road' };
+  }
+  if (combined.includes('market road') || combined.includes('ig road')) {
+    return { latitude: 13.3161, longitude: 75.7720, city: 'Chikkamagaluru', area: 'Market Road' };
+  }
+  if (combined.includes('mg road')) {
+    return { latitude: 13.3175, longitude: 75.7725, city: 'Chikkamagaluru', area: 'MG Road' };
+  }
+  if (combined.includes('km road')) {
+    return { latitude: 13.3280, longitude: 75.7650, city: 'Chikkamagaluru', area: 'KM Road' };
+  }
+  if (combined.includes('basavanahalli')) {
+    return { latitude: 13.3180, longitude: 75.7760, city: 'Chikkamagaluru', area: 'Basavanahalli' };
+  }
+  if (combined.includes('shankarpura')) {
+    return { latitude: 13.3140, longitude: 75.7680, city: 'Chikkamagaluru', area: 'Shankarpura' };
+  }
+  if (combined.includes('kalyan nagar')) {
+    return { latitude: 13.3315, longitude: 75.7830, city: 'Chikkamagaluru', area: 'Kalyan Nagar' };
+  }
+  if (combined.includes('housing board') || combined.includes('khb')) {
+    return { latitude: 13.3340, longitude: 75.7710, city: 'Chikkamagaluru', area: 'Housing Board Colony' };
+  }
+  if (combined.includes('jyothi nagar')) {
+    return { latitude: 13.3320, longitude: 75.7610, city: 'Chikkamagaluru', area: 'Jyothi Nagar' };
+  }
+  if (combined.includes('dantaramakki')) {
+    return { latitude: 13.3260, longitude: 75.7920, city: 'Chikkamagaluru', area: 'Dantaramakki' };
+  }
+  if (combined.includes('ramanahalli')) {
+    return { latitude: 13.3080, longitude: 75.7850, city: 'Chikkamagaluru', area: 'Ramanahalli' };
+  }
+  if (combined.includes('bus stand')) {
+    return { latitude: 13.3195, longitude: 75.7745, city: 'Chikkamagaluru', area: 'Bus Stand Road' };
+  }
+  if (combined.includes('naidu street')) {
+    return { latitude: 13.3170, longitude: 75.7740, city: 'Chikkamagaluru', area: 'Naidu Street' };
+  }
+  if (combined.includes('chikmagalur') || combined.includes('chikkamagaluru') || combined.includes('chikkamanglur') || combined.includes('577101')) {
+    return { latitude: 13.3161, longitude: 75.7720, city: 'Chikkamagaluru', area: 'Chikkamagaluru' };
+  }
+
+  // Fallback to reference lookup table
+  for (const loc of KNOWN_LOCALITY_LOOKUP) {
+    if (combined.includes(loc.area.toLowerCase()) || combined.includes(loc.name.toLowerCase())) {
+      return { latitude: loc.lat, longitude: loc.lon, city: loc.city, area: loc.area };
+    }
+  }
+
+  return { latitude: 13.3284, longitude: 75.7578, city: 'Chikkamagaluru', area: 'Uppalli' };
+}
+
 // Fetch saved customer address and profile from Supabase by 10-digit phone number
 export async function fetchCustomerAddressByPhone(phone) {
   if (!isSupabaseConfigured || !phone) return null;
@@ -292,16 +457,38 @@ export async function fetchCustomerAddressByPhone(phone) {
     const matchedAddress = (addresses || []).find(a => get10DigitPhone(a.phone) === cleanDigits);
 
     if (matchedAddress || matchedProfile) {
+      const rawAddressText = matchedAddress?.address_text || '';
+      let lat = matchedAddress?.latitude != null ? parseFloat(matchedAddress.latitude) : null;
+      let lon = matchedAddress?.longitude != null ? parseFloat(matchedAddress.longitude) : null;
+      let resolvedCity = matchedAddress?.city || 'Chikkamagaluru';
+
+      // Detect and self-heal coordinate corruption (e.g., Chikkamagaluru address stored with Bengaluru coords)
+      const textLower = `${rawAddressText} ${matchedAddress?.street || ''} ${matchedAddress?.city || ''}`.toLowerCase();
+      const isChik = textLower.includes('chikmagalur') || textLower.includes('chikkamagaluru') || textLower.includes('uppalli') || textLower.includes('577101');
+      const isBlr = textLower.includes('bengaluru') || textLower.includes('bangalore') || textLower.includes('indiranagar') || textLower.includes('koramangala');
+
+      if ((isChik && lat != null && lat < 13.1) || (isBlr && lat != null && lat > 13.1) || lat == null || lon == null) {
+        const resolved = resolveAddressCoordinates(rawAddressText, matchedAddress?.street, matchedAddress?.city);
+        lat = resolved.latitude;
+        lon = resolved.longitude;
+        resolvedCity = resolved.city;
+
+        // Self-heal row in Supabase
+        if (matchedAddress?.id) {
+          supabase.from('customer_addresses').update({ latitude: lat, longitude: lon, city: resolvedCity }).eq('id', matchedAddress.id).catch?.(() => {});
+        }
+      }
+
       return {
         full_name: matchedAddress?.full_name || matchedProfile?.full_name || '',
         phone: matchedAddress?.phone || matchedProfile?.phone || `+91${cleanDigits}`,
-        address_text: matchedAddress?.address_text || '',
-        city: matchedAddress?.city || 'Bengaluru',
+        address_text: rawAddressText,
+        city: resolvedCity,
         flat: matchedAddress?.flat || '',
         street: matchedAddress?.street || '',
         pincode: matchedAddress?.pincode || '',
-        latitude: matchedAddress?.latitude != null ? parseFloat(matchedAddress.latitude) : 12.9784,
-        longitude: matchedAddress?.longitude != null ? parseFloat(matchedAddress.longitude) : 77.6408
+        latitude: lat,
+        longitude: lon
       };
     }
     return null;
@@ -350,10 +537,28 @@ export async function saveCustomerPhoneAddress(param1, param2) {
     const { data: existingAddrs } = await supabase.from('customer_addresses').select('*');
     const existing = (existingAddrs || []).find(a => get10DigitPhone(a.phone) === cleanDigits);
 
-    const resolvedCity = city || district || 'Bengaluru';
-    const resolvedPincode = pincode || '';
     const resolvedStreet = street || area || '';
-    const resolvedAddressText = addressText || `${flat ? flat + ', ' : ''}${resolvedStreet ? resolvedStreet + ', ' : ''}${resolvedCity}${resolvedPincode ? ' - ' + resolvedPincode : ''}`.trim();
+    const rawAddress = addressText || `${flat ? flat + ', ' : ''}${resolvedStreet ? resolvedStreet + ', ' : ''}${city || ''}${pincode ? ' - ' + pincode : ''}`.trim();
+
+    // Accurately resolve coordinates
+    let finalLat = latitude != null ? parseFloat(latitude) : null;
+    let finalLon = longitude != null ? parseFloat(longitude) : null;
+
+    const coordResolved = resolveAddressCoordinates(rawAddress, resolvedStreet, city);
+
+    // Validate that lat/lon match the locality
+    const textLower = `${rawAddress} ${resolvedStreet} ${city || ''}`.toLowerCase();
+    const isChik = textLower.includes('chikmagalur') || textLower.includes('chikkamagaluru') || textLower.includes('uppalli') || textLower.includes('577101');
+    const isBlr = textLower.includes('bengaluru') || textLower.includes('bangalore') || textLower.includes('indiranagar') || textLower.includes('koramangala');
+
+    if (finalLat == null || finalLon == null || (isChik && finalLat < 13.1) || (isBlr && finalLat > 13.1)) {
+      finalLat = coordResolved.latitude;
+      finalLon = coordResolved.longitude;
+    }
+
+    const resolvedCity = city || coordResolved.city || 'Chikkamagaluru';
+    const resolvedPincode = pincode || (resolvedCity === 'Bengaluru' ? '560038' : '577101');
+    const resolvedAddressText = rawAddress || `${flat ? flat + ', ' : ''}${resolvedStreet ? resolvedStreet + ', ' : ''}${resolvedCity}${resolvedPincode ? ' - ' + resolvedPincode : ''}`.trim();
 
     const payload = {
       phone: normalized,
@@ -362,8 +567,8 @@ export async function saveCustomerPhoneAddress(param1, param2) {
       street: resolvedStreet,
       city: resolvedCity,
       pincode: resolvedPincode,
-      latitude: latitude != null ? parseFloat(latitude) : 12.9784,
-      longitude: longitude != null ? parseFloat(longitude) : 77.6408,
+      latitude: finalLat,
+      longitude: finalLon,
       address_text: resolvedAddressText
     };
 

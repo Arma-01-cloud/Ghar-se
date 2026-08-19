@@ -44,9 +44,13 @@ export const CartProvider = ({ children }) => {
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
-      latitude: 13.3161,
-      longitude: 75.7720,
-      name: 'Chikkamagaluru, Karnataka',
+      latitude: 13.3284,
+      longitude: 75.7578,
+      name: 'Uppalli, Chikkamagaluru',
+      area: 'Uppalli',
+      city: 'Chikkamagaluru',
+      state: 'Karnataka',
+      pincode: '577101',
       flat: '',
       street: ''
     };
