@@ -49,7 +49,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
       return;
     }
 
-    setFeedback({ type: 'success', message: 'Welcome to GharSee! Your Customer account is ready.' });
+    setFeedback({ type: 'success', message: 'Welcome to UR GROZY! Your Customer account is ready.' });
     setTimeout(() => {
       onClose();
       setActiveTab('home');
@@ -82,7 +82,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
 
     setFeedback({
       type: 'success',
-      message: 'Welcome to GharSee! Your Shopkeeper account is ready.'
+      message: 'Welcome to UR GROZY! Your Shopkeeper account is ready.'
     });
 
     setTimeout(() => {
@@ -115,7 +115,7 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
 
     setFeedback({
       type: 'success',
-      message: 'Welcome to GharSee! Your Rider account is ready.'
+      message: 'Welcome to UR GROZY! Your Rider account is ready.'
     });
 
     setTimeout(() => {
@@ -173,10 +173,10 @@ export default function RoleSelectionModal({ isOpen, onClose }) {
             <Leaf className="w-7 h-7 stroke-[2.5]" />
           </div>
           <h2 className="font-display font-black text-2xl text-stone-900">
-            Welcome to GharSee
+            Welcome to UR GROZY
           </h2>
           <p className="text-stone-500 text-xs sm:text-sm">
-            {selectedRole ? `Sign up as a ${selectedRole.toUpperCase()}` : 'How would you like to use GharSee?'}
+            {selectedRole ? `Sign up as a ${selectedRole.toUpperCase()}` : 'How would you like to use UR GROZY?'}
           </p>
         </div>
 

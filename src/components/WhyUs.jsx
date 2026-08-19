@@ -1,27 +1,17 @@
 import React from 'react';
-import { Leaf, Clock, ScanLine, HeartHandshake } from 'lucide-react';
+import { Store, UploadCloud } from 'lucide-react';
 
 export default function WhyUs() {
   const reasons = [
     {
-      icon: Leaf,
-      title: 'Direct Farm Harvest',
-      desc: 'We source fruits, veggies, and dairy directly from local verified farmers every single morning at 4:00 AM.'
+      icon: Store,
+      title: 'Trusted Local Shops',
+      desc: 'We deliver your groceries from trusted local shops in your neighborhood, bringing everyday essentials right to your doorstep.'
     },
     {
-      icon: Clock,
-      title: 'Scheduled Evening Delivery',
-      desc: 'Orders are fulfilled from local neighborhood stores with guaranteed doorstep delivery done after 4:00 PM.'
-    },
-    {
-      icon: ScanLine,
-      title: 'AI Photo List Converter',
-      desc: 'Simply snap your handwritten shopping list or paper note to automatically build an editable cart.'
-    },
-    {
-      icon: HeartHandshake,
-      title: 'Zero Plastics & Fair Pricing',
-      desc: 'Delivered in 100% biodegradable cloth bags with zero plastic wraps and honest transparent pricing.'
+      icon: UploadCloud,
+      title: 'Upload Your Grocery List',
+      desc: 'Simply upload a photo of your grocery list, and we’ll send it to your selected local shop for easy order processing.'
     }
   ];
 
@@ -32,26 +22,26 @@ export default function WhyUs() {
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700">OUR COMMITMENT</span>
           <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-stone-900">
-            Why Choose GharSee?
+            Why Choose UR GROZY?
           </h2>
           <p className="text-stone-500 text-sm">
             Experience the gold standard in fresh local grocery commerce & convenient list conversion.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {reasons.map((r, idx) => {
             const Icon = r.icon;
             return (
               <div
                 key={idx}
-                className="bg-white p-6 rounded-3xl border border-stone-200/80 space-y-3 hover:border-emerald-300 hover:shadow-lg transition-all duration-300 group"
+                className="bg-white p-6 sm:p-8 rounded-3xl border border-stone-200/80 space-y-3 hover:border-emerald-300 hover:shadow-lg transition-all duration-300 group"
               >
                 <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Icon className="w-6 h-6 stroke-[2.2]" />
                 </div>
-                <h3 className="font-display font-extrabold text-lg text-stone-900">{r.title}</h3>
-                <p className="text-stone-500 text-xs leading-relaxed">{r.desc}</p>
+                <h3 className="font-display font-extrabold text-lg sm:text-xl text-stone-900">{r.title}</h3>
+                <p className="text-stone-500 text-xs sm:text-sm leading-relaxed">{r.desc}</p>
               </div>
             );
           })}

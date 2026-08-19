@@ -43,7 +43,7 @@ function PartnerAppContent() {
       <div className="max-w-4xl mx-auto w-full my-auto space-y-8 py-12">
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-black uppercase tracking-wider">
-            GHARSEE PARTNER ECOSYSTEM
+            UR GROZY PARTNER ECOSYSTEM
           </div>
           <h1 className="font-display font-black text-3xl sm:text-5xl text-stone-900 tracking-tight">
             Select Your Partner Portal
@@ -111,7 +111,7 @@ function PartnerAppContent() {
       </div>
 
       <footer className="text-center text-xs text-stone-400 font-semibold py-4 border-t border-stone-200/60">
-        © {new Date().getFullYear()} GharSee Partner Technologies • Store & Delivery Operations
+        © {new Date().getFullYear()} UR GROZY Partner Technologies • Store & Delivery Operations
       </footer>
     </div>
   );

@@ -33,7 +33,7 @@ export default function AdminOverviewTab() {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-emerald-200 text-xs font-black uppercase tracking-wider">
               <ShieldCheck className="w-4 h-4" />
-              <span>GharSee Master Control</span>
+              <span>UR GROZY Master Control</span>
             </div>
             <h2 className="font-display text-2xl sm:text-4xl font-black text-white tracking-tight">
               Network Operations Overview

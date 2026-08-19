@@ -13,7 +13,7 @@ export default function Testimonials() {
       name: 'Vikram Mehta',
       location: 'Koramangala, Bengaluru',
       rating: 5,
-      comment: 'The quality of royal Gala apples and fresh spinach is superior to supermarket chains. Vegetables arrive crisp, fresh, and clean. GharSee is now my go-to weekly app.'
+      comment: 'The quality of royal Gala apples and fresh spinach is superior to supermarket chains. Vegetables arrive crisp, fresh, and clean. UR GROZY is now my go-to weekly app.'
     },
     {
       name: 'Pooja Iyer',

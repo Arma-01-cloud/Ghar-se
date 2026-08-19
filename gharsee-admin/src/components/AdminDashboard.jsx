@@ -37,7 +37,7 @@ export default function AdminDashboard() {
 
       {/* FOOTER */}
       <footer className="border-t border-stone-200 bg-white py-5 text-center text-xs text-stone-400 font-medium">
-        <span>© {new Date().getFullYear()} GharSee Marketplace Technologies • Admin Command HQ • Secure Session Protected</span>
+        <span>© {new Date().getFullYear()} UR GROZY Marketplace Technologies • Admin Command HQ • Secure Session Protected</span>
       </footer>
 
       {/* GLOBAL FLOATING TOASTS */}

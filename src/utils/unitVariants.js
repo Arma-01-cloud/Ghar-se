@@ -1,5 +1,5 @@
 /**
- * Unit & Weight Variants Utility for GharSee Customer Platform
+ * Unit & Weight Variants Utility for UR GROZY Customer Platform
  * Supports:
  * - Rice & Grains: 500g, 1 kg, 2 kg, 5 kg, 25 kg
  * - Flour & Wheat (Atta/Maida/Sooji): 500g, 1 kg, 2 kg, 5 kg, 10 kg

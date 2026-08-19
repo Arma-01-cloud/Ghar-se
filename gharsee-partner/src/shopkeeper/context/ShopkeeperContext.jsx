@@ -91,7 +91,7 @@ export const ShopkeeperProvider = ({ children }) => {
           name: matchedShop.name,
           ownerName: matchedShop.owner_name || 'Store Owner',
           phone: matchedShop.phone || userPhone,
-          email: matchedShop.email || 'store@gharsee.app',
+          email: matchedShop.email || 'store@urgrozy.app',
           address: matchedShop.address || 'Chikkamagaluru, Karnataka',
           isOpen: matchedShop.is_open ?? (matchedShop.status === 'open' || matchedShop.status === 'active'),
           status: matchedShop.status,

@@ -121,7 +121,7 @@ export default function ShopkeeperStorePage() {
     name: storeProfile?.name || '',
     ownerName: storeProfile?.ownerName || authUser?.user_metadata?.full_name || '',
     phone: storeProfile?.phone || authUser?.phone || authUser?.user_metadata?.phone || '',
-    email: storeProfile?.email || authUser?.email || 'store@gharsee.app',
+    email: storeProfile?.email || authUser?.email || 'store@urgrozy.app',
     shopNumber: '',
     street: '',
     locality: storeProfile?.locality || 'Indiranagar',

@@ -1,5 +1,5 @@
 /**
- * Client-Side Image Compression Utility for GharSee Grocery Orders
+ * Client-Side Image Compression Utility for UR GROZY Grocery Orders
  *
  * Compresses camera and gallery photos before uploading to Supabase Storage.
  * Resizes excessively large dimensions, steps down quality iteratively to target 100-300 KB,

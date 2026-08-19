@@ -145,7 +145,7 @@ export default function AdminLogin() {
       </div>
 
       <div className="text-center text-xs text-stone-400 font-semibold py-4">
-        © {new Date().getFullYear()} GharSee Central Platform Operations. All rights reserved.
+        © {new Date().getFullYear()} UR GROZY Central Platform Operations. All rights reserved.
       </div>
     </div>
   );

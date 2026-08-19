@@ -26,7 +26,7 @@ export const PRODUCTS = [
     image: '/images/cat_veg_fruits.jpg',
     unit: '1 kg',
     stock: 45,
-    brand: 'GharSee Organic',
+    brand: 'UR GROZY Organic',
     isPopular: true
   },
   {
@@ -58,7 +58,7 @@ export const PRODUCTS = [
     image: '/images/cat_veg_fruits.jpg',
     unit: '250 g',
     stock: 60,
-    brand: 'GharSee Greens',
+    brand: 'UR GROZY Greens',
     isPopular: false
   },
   {
@@ -172,7 +172,7 @@ export const PRODUCTS = [
     image: '/images/cat_dairy.jpg',
     unit: '200 g',
     stock: 50,
-    brand: 'GharSee',
+    brand: 'UR GROZY',
     isPopular: true
   },
 
@@ -370,7 +370,7 @@ export const PRODUCTS = [
     image: '/images/promo_basket.jpg',
     unit: '250 g',
     stock: 55,
-    brand: 'GharSee Nutri',
+    brand: 'UR GROZY Nutri',
     isPopular: true
   },
 

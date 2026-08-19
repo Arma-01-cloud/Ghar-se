@@ -40,7 +40,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav 
-      aria-label="GharSee Mobile Navigation"
+      aria-label="UR GROZY Mobile Navigation"
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FBF9F5]/95 backdrop-blur-lg border-t border-stone-200/90 shadow-[0_-8px_30px_rgba(8,36,27,0.08)] px-2 sm:px-3 py-2 safe-bottom select-none"
     >
       <div className="max-w-lg mx-auto flex items-center justify-between gap-1 sm:gap-2">

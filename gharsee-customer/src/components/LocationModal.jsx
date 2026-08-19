@@ -593,4 +593,3 @@ export default function LocationModal({ isOpen, onClose, currentLocation, onSele
     </div>
   );
 }
-

@@ -47,7 +47,7 @@ export default function AdminOrdersTab() {
               <span>Global Live Order Flow ({orders.length})</span>
             </h2>
             <p className="text-xs text-stone-500 font-medium mt-1">
-              Real-time multi-store orders across the GharSee darkstore network.
+              Real-time multi-store orders across the UR GROZY darkstore network.
             </p>
           </div>
 
