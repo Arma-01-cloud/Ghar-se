@@ -77,12 +77,10 @@ export async function fetchStores(customerLat = null, customerLon = null, locali
     }
   }
 
-  // If no stores in Supabase, fall back to initial local stores
   if (shopRows.length === 0) {
     shopRows = STORES;
   }
 
-  // Filter out stores pending approval or rejected
   const approvedShopRows = shopRows.filter(s => {
     const st = (s.status || '').toLowerCase();
     if (st === 'pending' || st === 'pending_approval' || st === 'rejected' || s.is_approved === false) {
@@ -95,13 +93,11 @@ export async function fetchStores(customerLat = null, customerLon = null, locali
   const parsedCustomerLon = customerLon != null ? parseFloat(customerLon) : null;
   const hasCustomerCoords = parsedCustomerLat != null && !isNaN(parsedCustomerLat) && parsedCustomerLon != null && !isNaN(parsedCustomerLon);
 
-  // Map and calculate real distances for every store
   const liveStores = approvedShopRows.map((s, idx) => {
     const coords = resolveStoreCoordinates(s);
     const shopLat = coords.latitude;
     const shopLon = coords.longitude;
 
-    // Asynchronously backfill coordinates to Supabase if missing in database
     if ((s.latitude == null || s.longitude == null) && shopLat != null && shopLon != null && isSupabaseConfigured && s.id && typeof s.id === 'string' && s.id.length > 20) {
       supabase.from('shops').update({ latitude: shopLat, longitude: shopLon }).eq('id', s.id).catch?.(() => {});
     }
@@ -155,21 +151,15 @@ export async function fetchStores(customerLat = null, customerLon = null, locali
     };
   });
 
-  // Locality Matching & Discovery Filter:
-  // If customer has a selected locality or coordinates, filter to relevant stores within delivery range (<= 45 km) or matching locality/city tokens
   let matchedStores = liveStores;
-
   const locQuery = `${localityName || ''} ${cityName || ''}`.toLowerCase().trim();
   const searchTokens = locQuery.split(/[\s,/-]+/).filter(t => t.length > 2);
 
   if (hasCustomerCoords) {
-    // 1. First find stores with real distance within 45 km radius OR matching locality/city tokens
     const nearbyStores = liveStores.filter(store => {
-      // Direct distance proximity
       if (store.distanceKm != null && store.distanceKm <= 45) {
         return true;
       }
-      // Locality / city text match
       const storeText = `${store.locality} ${store.city} ${store.address}`.toLowerCase();
       if (searchTokens.some(token => storeText.includes(token))) {
         return true;
@@ -180,7 +170,6 @@ export async function fetchStores(customerLat = null, customerLon = null, locali
     if (nearbyStores.length > 0) {
       matchedStores = nearbyStores;
     } else if (searchTokens.length > 0) {
-      // If none within 45km, only match if explicit locality match exists, otherwise return empty (no far-away stores)
       matchedStores = liveStores.filter(store => {
         const storeText = `${store.locality} ${store.city} ${store.address}`.toLowerCase();
         return searchTokens.some(token => storeText.includes(token));
@@ -196,7 +185,6 @@ export async function fetchStores(customerLat = null, customerLon = null, locali
     }
   }
 
-  // Sort matched stores strictly by real geographic distance (Nearest First)
   matchedStores.sort((a, b) => {
     if (a.distanceKm != null && b.distanceKm != null) {
       return a.distanceKm - b.distanceKm;
@@ -209,7 +197,7 @@ export async function fetchStores(customerLat = null, customerLon = null, locali
   return { stores: matchedStores, error: null };
 }
 
-// Create a new store in Supabase shops table
+// Create a new store in Supabase shops table with owner_id foreign key safety
 export async function createStoreInSupabase(storeData, fallbackUser = null) {
   if (!isSupabaseConfigured) {
     return { data: null, error: 'Supabase is not configured' };
@@ -222,7 +210,6 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
     const storeState = storeData.state || 'Karnataka';
     const storePincode = storeData.pincode || '577101';
 
-    // Resolve accurate coordinates
     const coords = resolveStoreCoordinates({
       latitude: storeData.latitude,
       longitude: storeData.longitude,
@@ -236,6 +223,24 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
 
     const ownerId = fallbackUser?.id || storeData.owner_id || null;
 
+    // 1. If ownerId is provided, guarantee profile row exists in public.profiles first
+    if (ownerId) {
+      try {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: ownerId,
+            phone: storePhone,
+            full_name: storeData.ownerName || 'Store Partner',
+            role: 'shopkeeper',
+            updated_at: new Date().toISOString()
+          });
+      } catch (profErr) {
+        console.warn('Profile ensure non-fatal warning:', profErr);
+      }
+    }
+
+    // 2. Primary Insert with owner_id
     const payload = {
       owner_id: ownerId,
       name: storeData.name,
@@ -260,10 +265,18 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
       .single();
 
     if (error) {
-      console.error('SHOP CREATION SUPABASE ERROR:', error.message);
+      console.warn('Primary shop insert failed, retrying with foreign-key resilience:', error.message);
 
-      const minimalPayload = {
-        owner_id: ownerId,
+      const isFkError = Boolean(
+        error.message?.includes('foreign key') || 
+        error.message?.includes('shops_owner_id_fkey') ||
+        error.code === '23503'
+      );
+
+      const safeOwnerId = isFkError ? null : ownerId;
+
+      const fallbackPayload = {
+        owner_id: safeOwnerId,
         name: storeData.name,
         phone: storePhone,
         address: storeData.address,
@@ -280,14 +293,25 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
 
       const { data: retryData, error: retryErr } = await supabase
         .from('shops')
-        .insert([minimalPayload])
+        .insert([fallbackPayload])
         .select();
 
       if (retryErr) {
+        console.error('Final fallback shop insert failed:', retryErr.message);
         return { data: null, error: retryErr.message };
       }
 
-      const createdObj = (retryData && retryData[0]) ? retryData[0] : { id: generateUUID(), ...minimalPayload };
+      const createdObj = (retryData && retryData[0]) ? retryData[0] : { id: generateUUID(), ...fallbackPayload };
+
+      // Background link owner_id if it was created with null due to FK constraint race
+      if (ownerId && createdObj.id && !createdObj.owner_id) {
+        setTimeout(async () => {
+          try {
+            await supabase.from('shops').update({ owner_id: ownerId }).eq('id', createdObj.id);
+          } catch {}
+        }, 500);
+      }
+
       return { data: createdObj, error: null };
     }
 

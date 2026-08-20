@@ -1,6 +1,6 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getSupabaseErrorMessage } from '../lib/supabase';
 
-// Enable real authentication with Supabase
+// Enable real authentication with Supabase Auth
 export const ENABLE_REAL_AUTH = true;
 
 // Standard RFC 4122 v4 UUID Generator
@@ -31,7 +31,16 @@ export function get10DigitPhone(phoneInput) {
   return phoneInput.replace(/\D/g, '').slice(-10);
 }
 
-// Phone + Password Sign Up for Shopkeepers (Saves password in shops table WITHOUT owner_id)
+// Deterministic auth identifier mapping using @gmail.com for 100% valid MX & Supabase Auth compatibility
+export function phoneToAuthEmail(phoneInput) {
+  const clean = get10DigitPhone(phoneInput);
+  if (!clean || clean.length < 10) return '';
+  return `user_${clean}@gmail.com`;
+}
+
+/**
+ * Sign Up Partner with Phone + Password natively using Supabase Auth
+ */
 export async function signUpUserWithPhone({ 
   phone, 
   password, 
@@ -56,80 +65,207 @@ export async function signUpUserWithPhone({
     return { user: null, session: null, error: 'Please enter a valid 10-digit mobile number.' };
   }
 
-  if (!password || password.length < 4) {
-    return { user: null, session: null, error: 'Password must be at least 4 characters long.' };
+  if (!password || password.length < 6) {
+    return { user: null, session: null, error: 'Password must be at least 6 characters long.' };
   }
 
   try {
     const normalizedPhone = normalizePhone(phone);
+    const authEmail = phoneToAuthEmail(phone);
+    const safeFullName = (fullName || (role === 'rider' ? 'Delivery Partner' : 'Store Partner')).trim();
 
-    // 1. Check if store with this 10-digit phone already exists in Supabase shops table
-    const { data: allShops } = await supabase.from('shops').select('*');
-    const existingShop = allShops?.find(s => get10DigitPhone(s.phone) === cleanDigits);
+    // 1. Primary Attempt: Supabase Auth Email-backed Provider
+    let authRes = await supabase.auth.signUp({
+      email: authEmail,
+      password: password,
+      options: {
+        data: {
+          phone: normalizedPhone,
+          full_name: safeFullName,
+          role: role
+        }
+      }
+    });
 
-    if (existingShop) {
-      return { user: null, session: null, error: `A store with phone number ${phone} is already registered in database. Please click Sign In.` };
-    }
-
-    // 2. Save profile in Supabase profiles table
-    let userId = generateUUID();
-    await supabase
-      .from('profiles')
-      .upsert({
-        id: userId,
+    // 2. Secondary Attempt: If Email signup is disabled in dashboard, attempt native Phone provider
+    if (authRes.error && (
+      authRes.error.message?.includes('Email signups are disabled') ||
+      authRes.error.message?.includes('signup_disabled')
+    )) {
+      const phoneRes = await supabase.auth.signUp({
         phone: normalizedPhone,
         password: password,
-        full_name: fullName || 'Store Partner',
-        role: role
+        options: {
+          data: {
+            phone: normalizedPhone,
+            full_name: safeFullName,
+            role: role
+          }
+        }
       });
+      if (!phoneRes.error && phoneRes.data?.user) {
+        authRes = phoneRes;
+      }
+    }
 
-    // 3. Create store in Supabase shops table (WITHOUT owner_id to prevent FK errors!)
+    // 3. Handle Errors / Existing Users / Rate Limits
+    if (authRes.error) {
+      const msg = (authRes.error.message || '').toLowerCase();
+
+      if (
+        msg.includes('rate limit') || 
+        msg.includes('rate_limit') || 
+        msg.includes('already registered') || 
+        msg.includes('already exists') || 
+        msg.includes('duplicate') || 
+        msg.includes('user already registered') ||
+        authRes.error.status === 429
+      ) {
+        const directSignIn = await signInUserWithPhone({ phone, password, expectedRole: role });
+        if (!directSignIn.error && directSignIn.user) {
+          return directSignIn;
+        }
+
+        if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already registered')) {
+          return {
+            user: null,
+            session: null,
+            error: `An account with mobile number ${cleanDigits} is already registered. Please enter your password and click Sign In.`
+          };
+        }
+
+        return {
+          user: null,
+          session: null,
+          error: 'Rate limit reached. Please disable "Confirm email" in Supabase Dashboard (Authentication ➔ Providers ➔ Email ➔ Turn off "Confirm email"), or click "Sign In / Login".'
+        };
+      }
+
+      if (msg.includes('email signups are disabled') || msg.includes('signup_disabled')) {
+        return {
+          user: null,
+          session: null,
+          error: 'Signups are disabled in your Supabase project settings. Please go to Supabase Dashboard ➔ Authentication ➔ Providers ➔ Email ➔ Turn ON "Allow new users to sign up" and turn OFF "Confirm email".'
+        };
+      }
+
+      return { user: null, session: null, error: getSupabaseErrorMessage ? getSupabaseErrorMessage(authRes.error) : authRes.error.message };
+    }
+
+    const authUser = authRes.data?.user;
+    if (!authUser) {
+      return { user: null, session: null, error: 'Failed to create partner authentication account.' };
+    }
+
+    // 4. Ensure profile in public.profiles table
+    try {
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: authUser.id,
+          phone: normalizedPhone,
+          full_name: safeFullName,
+          role: role,
+          updated_at: new Date().toISOString()
+        });
+    } catch (profileErr) {
+      console.warn('Profile sync non-fatal warning:', profileErr);
+    }
+
+    // 5. Create store in Supabase shops table with owner_id
     if (role === 'shopkeeper') {
       const shopLocality = locality || 'Uppalli';
       const shopCity = city || 'Chikkamagaluru';
       const shopState = state || 'Karnataka';
       const shopAddress = address || `${shopLocality}, ${shopCity}, ${shopState}${pincode ? ' - ' + pincode : ''}`;
 
-      const { data: newShop, error: shopErr } = await supabase
-        .from('shops')
-        .insert([{
-          name: storeName,
-          phone: normalizedPhone,
-          password: password,
-          address: shopAddress,
-          locality: shopLocality,
-          city: shopCity,
-          state: shopState,
-          pincode: pincode || '577101',
-          latitude: latitude != null ? parseFloat(latitude) : 13.3284,
-          longitude: longitude != null ? parseFloat(longitude) : 75.7578,
-          status: 'pending_approval',
-          is_open: false,
-          image_url: imageUrl || '/images/store_lakshmi.jpg'
-        }])
-        .select()
-        .single();
+      try {
+        await supabase
+          .from('shops')
+          .insert([{
+            owner_id: authUser.id,
+            name: storeName || 'My Grocery Store',
+            phone: normalizedPhone,
+            address: shopAddress,
+            locality: shopLocality,
+            city: shopCity,
+            state: shopState,
+            pincode: pincode || '577101',
+            latitude: latitude != null ? parseFloat(latitude) : 13.3284,
+            longitude: longitude != null ? parseFloat(longitude) : 75.7578,
+            status: 'pending_approval',
+            is_approved: false,
+            is_open: false,
+            image_url: imageUrl || '/images/store_lakshmi.jpg'
+          }]);
+      } catch (shopErr) {
+        console.warn('Shop creation warning:', shopErr);
+      }
+    } else if (role === 'rider') {
+      try {
+        const riderCity = city || deliveryCity || 'Chikkamagaluru, Karnataka';
+        const vType = (vehicleType || 'scooter').toLowerCase();
+        const vNum = (vehicleNumber || 'KA-14-EA-2024').trim().toUpperCase();
+        const dLic = (drivingLicense || 'KA1420240098765').trim().toUpperCase();
+        const cleanDigits = get10DigitPhone(normalizedPhone);
 
-      if (shopErr) {
-        console.error('Supabase shops table insert error:', shopErr);
+        const { data: allR } = await supabase.from('rider_profiles').select('id, phone');
+        const existingR = (allR || []).find(r => get10DigitPhone(r.phone) === cleanDigits);
+
+        if (existingR?.id) {
+          await supabase
+            .from('rider_profiles')
+            .update({
+              user_id: authUser.id,
+              full_name: safeFullName,
+              vehicle_type: vType,
+              vehicle_number: vNum,
+              driving_license: dLic,
+              delivery_city: riderCity,
+              is_approved: false,
+              status: 'pending_approval',
+              is_online: false
+            })
+            .eq('id', existingR.id);
+        } else {
+          await supabase
+            .from('rider_profiles')
+            .insert([{
+              user_id: authUser.id,
+              full_name: safeFullName,
+              phone: normalizedPhone,
+              vehicle_type: vType,
+              vehicle_number: vNum,
+              driving_license: dLic,
+              delivery_city: riderCity,
+              is_approved: false,
+              status: 'pending_approval',
+              is_online: false
+            }]);
+        }
+      } catch (riderErr) {
+        console.warn('Rider creation warning in signUpUserWithPhone:', riderErr);
       }
     }
 
     const userObj = {
-      id: userId,
+      id: authUser.id,
       phone: normalizedPhone,
-      user_metadata: { full_name: fullName, role }
+      role: role,
+      user_metadata: { full_name: safeFullName, role: role, phone: normalizedPhone }
     };
 
-    return { user: userObj, session: null, error: null };
+    return { user: userObj, session: authRes.data.session, error: null };
   } catch (err) {
     console.error('Exception in signUpUserWithPhone:', err);
     return { user: null, session: null, error: err.message || 'Store registration failed' };
   }
 }
 
-// Phone + Password Sign In for Shopkeepers (VERIFIES DIRECTLY FROM SHOPS TABLE IN SUPABASE)
-export async function signInUserWithPhone({ phone, password }) {
+/**
+ * Sign In Partner with Phone + Password natively using Supabase Auth
+ */
+export async function signInUserWithPhone({ phone, password, expectedRole = 'shopkeeper' }) {
   if (!isSupabaseConfigured) {
     return { session: null, user: null, error: 'Supabase is not configured' };
   }
@@ -145,63 +281,199 @@ export async function signInUserWithPhone({ phone, password }) {
 
   try {
     const normalizedPhone = normalizePhone(phone);
+    const candidateEmails = [
+      `user_${cleanDigits}@gmail.com`,
+      `phone_${cleanDigits}@gmail.com`,
+      `partner_${cleanDigits}@urgrozy.in`,
+      `user_${cleanDigits}@urgrozy.in`
+    ];
 
-    // 1. Fetch all shops from Supabase shops table and match by 10-digit phone number
-    const { data: shops, error: shopsErr } = await supabase.from('shops').select('*');
+    let authRes = null;
 
-    if (shopsErr) {
-      console.error('Error fetching shops from Supabase:', shopsErr);
+    // 1. Try candidate email authenticators
+    for (const email of candidateEmails) {
+      const res = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+      if (!res.error && res.data?.user) {
+        authRes = res;
+        break;
+      }
     }
 
-    const matchedShop = (shops || []).find(s => get10DigitPhone(s.phone) === cleanDigits);
+    // 2. If email sign in failed, try native phone sign in
+    if (!authRes || !authRes.data?.user) {
+      const phoneRes = await supabase.auth.signInWithPassword({
+        phone: normalizedPhone,
+        password: password
+      });
+      if (!phoneRes.error && phoneRes.data?.user) {
+        authRes = phoneRes;
+      }
+    }
 
-    // 2. Fetch profiles table fallback
+    // 3. If Sign In succeeded with Supabase Auth
+    if (authRes && authRes.data?.user) {
+      const authUser = authRes.data.user;
+      let userRole = authUser.user_metadata?.role || expectedRole;
+      let userFullName = authUser.user_metadata?.full_name || (expectedRole === 'rider' ? 'Delivery Partner' : 'Store Partner');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (profile) {
+        userRole = profile.role || userRole;
+        userFullName = profile.full_name || userFullName;
+      } else {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: authUser.id,
+            phone: normalizedPhone,
+            role: userRole,
+            full_name: userFullName,
+            updated_at: new Date().toISOString()
+          })
+          .catch?.(() => {});
+      }
+
+      // Role check
+      if (expectedRole && userRole && userRole !== expectedRole) {
+        return {
+          session: null,
+          user: null,
+          profile: null,
+          error: `Access Restricted: This account is registered as a ${userRole === 'rider' ? 'Delivery Partner (Rider)' : 'Store Partner (Shopkeeper)'}. Please sign in to the appropriate portal.`
+        };
+      }
+
+      // Link store owner_id or rider_profiles user_id if needed
+      if (expectedRole === 'shopkeeper') {
+        const { data: shops } = await supabase.from('shops').select('id, owner_id, phone');
+        const matchedShop = (shops || []).find(s => get10DigitPhone(s.phone) === cleanDigits);
+        if (matchedShop && (!matchedShop.owner_id || matchedShop.owner_id !== authUser.id)) {
+          await supabase.from('shops').update({ owner_id: authUser.id }).eq('id', matchedShop.id).catch?.(() => {});
+        }
+      } else if (expectedRole === 'rider') {
+        const { data: riders } = await supabase.from('rider_profiles').select('id, user_id, phone, is_approved, status');
+        const matchedRider = (riders || []).find(r => get10DigitPhone(r.phone) === cleanDigits);
+        if (matchedRider && (!matchedRider.user_id || matchedRider.user_id !== authUser.id)) {
+          const isAppr = matchedRider.is_approved === true && matchedRider.status === 'active';
+          await supabase.from('rider_profiles').update({ 
+            user_id: authUser.id,
+            is_online: isAppr ? true : false 
+          }).eq('id', matchedRider.id).catch?.(() => {});
+        }
+      }
+
+      return {
+        session: authRes.data.session,
+        user: {
+          id: authUser.id,
+          phone: normalizedPhone,
+          role: userRole,
+          user_metadata: { full_name: userFullName, role: userRole, phone: normalizedPhone }
+        },
+        profile: profile || { id: authUser.id, role: userRole, phone: normalizedPhone, full_name: userFullName },
+        error: null
+      };
+    }
+
+    // 4. Fallback: Auto-onboard legacy database user into Supabase Auth
+    let matchedLegacy = null;
+    let legacyName = expectedRole === 'rider' ? 'Delivery Partner' : 'Store Partner';
+
+    if (expectedRole === 'shopkeeper') {
+      const { data: shops } = await supabase.from('shops').select('*');
+      matchedLegacy = (shops || []).find(s => get10DigitPhone(s.phone) === cleanDigits);
+      if (matchedLegacy) {
+        legacyName = matchedLegacy.name || matchedLegacy.owner_name || 'Store Partner';
+      }
+    } else if (expectedRole === 'rider') {
+      const { data: riders } = await supabase.from('rider_profiles').select('*');
+      matchedLegacy = (riders || []).find(r => get10DigitPhone(r.phone) === cleanDigits);
+      if (matchedLegacy) {
+        legacyName = matchedLegacy.full_name || matchedLegacy.name || 'Delivery Partner';
+      }
+    }
+
     const { data: profiles } = await supabase.from('profiles').select('*');
     const matchedProfile = (profiles || []).find(p => get10DigitPhone(p.phone) === cleanDigits);
 
-    // CRITICAL CHECK 1: IF PERSON IS NOT IN SHOPS OR PROFILES TABLE -> DENY ACCESS!
-    if (!matchedShop && !matchedProfile) {
-      return { 
-        session: null, 
-        user: null, 
-        profile: null, 
-        error: `No store account found in database for mobile number ${phone}. Access denied. Please register your store under 'Register Your Store'.` 
-      };
-    }
+    if (matchedLegacy || matchedProfile) {
+      const primaryEmail = phoneToAuthEmail(phone);
+      const newAuthRes = await supabase.auth.signUp({
+        email: primaryEmail,
+        password: password,
+        options: {
+          data: {
+            phone: normalizedPhone,
+            full_name: legacyName,
+            role: expectedRole
+          }
+        }
+      });
 
-    // CRITICAL CHECK 2: VERIFY PASSWORD DIRECTLY FROM SHOPS TABLE RECORD
-    const dbPassword = matchedShop?.password || matchedProfile?.password;
+      if (!newAuthRes.error && newAuthRes.data?.user) {
+        const newUserId = newAuthRes.data.user.id;
 
-    if (dbPassword && dbPassword !== password) {
-      return {
-        session: null,
-        user: null,
-        profile: null,
-        error: 'Incorrect password for this store. Phone number and password do not match our database records.'
-      };
-    }
-
-    // If shop had NULL password (legacy record), update password in Supabase shops table
-    if (matchedShop && !matchedShop.password) {
-      try {
         await supabase
-          .from('shops')
-          .update({ password: password })
-          .eq('id', matchedShop.id);
-      } catch {}
+          .from('profiles')
+          .upsert({
+            id: newUserId,
+            phone: normalizedPhone,
+            full_name: legacyName,
+            role: expectedRole,
+            updated_at: new Date().toISOString()
+          })
+          .catch?.(() => {});
+
+        if (expectedRole === 'shopkeeper' && matchedLegacy?.id) {
+          await supabase.from('shops').update({ owner_id: newUserId }).eq('id', matchedLegacy.id).catch?.(() => {});
+        } else if (expectedRole === 'rider' && matchedLegacy?.id) {
+          const isAppr = matchedLegacy.is_approved === true && matchedLegacy.status === 'active';
+          await supabase.from('rider_profiles').update({ 
+            user_id: newUserId,
+            is_online: isAppr ? true : false 
+          }).eq('id', matchedLegacy.id).catch?.(() => {});
+        }
+
+        return {
+          session: newAuthRes.data.session,
+          user: {
+            id: newUserId,
+            phone: normalizedPhone,
+            role: expectedRole,
+            user_metadata: { full_name: legacyName, role: expectedRole, phone: normalizedPhone }
+          },
+          profile: { id: newUserId, phone: normalizedPhone, role: expectedRole, full_name: legacyName },
+          error: null
+        };
+      }
     }
 
-    const userObj = {
-      id: matchedShop?.id || matchedProfile?.id || generateUUID(),
-      phone: matchedShop?.phone || normalizedPhone,
-      user_metadata: { full_name: matchedShop?.name || matchedProfile?.full_name || 'Store Partner', role: 'shopkeeper' }
+    return {
+      session: null,
+      user: null,
+      profile: null,
+      error: 'Invalid mobile phone number or password. Please check your credentials.'
     };
-
-    return { session: null, user: userObj, profile: matchedShop || matchedProfile, error: null };
   } catch (err) {
     console.error('Exception in signInUserWithPhone:', err);
     return { session: null, user: null, error: 'Authentication failed. Please check phone number and password.' };
   }
+}
+
+export async function signUpPartnerWithPhone(params) {
+  return signUpUserWithPhone(params);
+}
+
+export async function signInPartnerWithPhone(params) {
+  return signInUserWithPhone(params);
 }
 
 export async function signUpUser(params) {
@@ -216,7 +488,9 @@ export async function signOutUser() {
   if (!isSupabaseConfigured) return;
   try {
     await supabase.auth.signOut();
-  } catch {}
+  } catch (err) {
+    console.warn('signOut error:', err);
+  }
 }
 
 export async function getCurrentUserProfile() {
@@ -232,7 +506,12 @@ export async function getCurrentUserProfile() {
       .eq('id', user.id)
       .maybeSingle();
 
-    return profile || { id: user.id, phone: user.phone || '', role: user.user_metadata?.role || 'customer' };
+    return profile || { 
+      id: user.id, 
+      phone: user.phone || user.user_metadata?.phone || '', 
+      role: user.user_metadata?.role || 'shopkeeper',
+      full_name: user.user_metadata?.full_name || 'Store Partner'
+    };
   } catch {
     return null;
   }

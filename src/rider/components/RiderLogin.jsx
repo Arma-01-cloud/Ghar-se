@@ -72,7 +72,7 @@ export default function RiderLogin() {
       return;
     }
 
-    addRiderToast('Rider profile registered in Supabase successfully! 🚴', 'success');
+    addRiderToast('Rider profile submitted for admin verification! 🚴', 'success');
     loginRider(res.user);
   };
 

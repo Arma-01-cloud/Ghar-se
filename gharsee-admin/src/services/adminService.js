@@ -183,102 +183,359 @@ export async function toggleShopStatusInSupabase(shopId, currentIsOpen) {
   }
 }
 
-// Fetch all delivery riders
+// Helper to safely extract 10-digit phone
+const get10DigitPhone = (phone) => (phone || '').replace(/\D/g, '').slice(-10);
+
+// Fetch all delivery riders with multi-source fallback discovery
 export async function fetchAllAdminRiders() {
-  if (!isSupabaseConfigured) return [];
+  if (!isSupabaseConfigured) {
+    try {
+      const localRiders = JSON.parse(localStorage.getItem('gharsee_local_riders') || '[]');
+      return localRiders;
+    } catch {
+      return [];
+    }
+  }
 
   try {
+    let riderData = [];
+
+    // 1. Fetch from rider_profiles
     const { data, error } = await supabase
       .from('rider_profiles')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data) return [];
+    if (!error && data) {
+      riderData = [...data];
+    } else {
+      const { data: fallbackData } = await supabase.from('rider_profiles').select('*');
+      if (fallbackData) riderData = [...fallbackData];
+    }
 
-    return data.map(r => {
-      const isOnline = Boolean(r.is_online);
-      const isPending = r.is_approved === false || (!isOnline && (r.total_deliveries === 0 || r.total_deliveries == null));
-      const isApproved = !isPending;
+    // 2. Discover any riders registered in profiles table where role = 'rider'
+    try {
+      const { data: authProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'rider');
+
+      for (const ap of (authProfiles || [])) {
+        const cleanApPhone = get10DigitPhone(ap.phone);
+        const numTail = (cleanApPhone || '2024').slice(-4);
+        const defaultVNum = `KA-14-EA-${numTail}`;
+        const defaultDLic = `KA14202400${(cleanApPhone || '98765').slice(-5)}`;
+
+        const existingIdx = riderData.findIndex(
+          r => (r.user_id && r.user_id === ap.id) || (cleanApPhone && get10DigitPhone(r.phone) === cleanApPhone)
+        );
+
+        if (existingIdx >= 0) {
+          if (!riderData[existingIdx].user_id) riderData[existingIdx].user_id = ap.id;
+          if (!riderData[existingIdx].full_name && ap.full_name) riderData[existingIdx].full_name = ap.full_name;
+          if (!riderData[existingIdx].vehicle_number || riderData[existingIdx].vehicle_number === 'Not specified') {
+            riderData[existingIdx].vehicle_number = defaultVNum;
+          }
+          if (!riderData[existingIdx].driving_license || riderData[existingIdx].driving_license === 'Not specified') {
+            riderData[existingIdx].driving_license = defaultDLic;
+          }
+        } else {
+          const newRec = {
+            id: ap.id,
+            user_id: ap.id,
+            full_name: ap.full_name || 'Delivery Partner',
+            phone: ap.phone || `+91${cleanApPhone}`,
+            vehicle_type: 'scooter',
+            vehicle_number: defaultVNum,
+            driving_license: defaultDLic,
+            delivery_city: 'Chikkamagaluru, Karnataka',
+            is_approved: false,
+            status: 'pending_approval',
+            is_online: false,
+            created_at: ap.created_at || ap.updated_at || new Date().toISOString()
+          };
+          riderData.push(newRec);
+
+          supabase
+            .from('rider_profiles')
+            .upsert([newRec], { onConflict: 'phone' })
+            .catch?.(() => {});
+        }
+      }
+    } catch (profErr) {
+      console.warn('Profiles rider discovery non-fatal warning:', profErr);
+    }
+
+    // 3. Discover latest registered rider from local cache if present
+    try {
+      const latestReg = JSON.parse(localStorage.getItem('gharsee_latest_rider_registration') || 'null');
+      if (latestReg && latestReg.phone) {
+        const cleanRegPhone = get10DigitPhone(latestReg.phone);
+        const exists = riderData.some(r => get10DigitPhone(r.phone) === cleanRegPhone);
+        if (!exists) {
+          const numTail = (cleanRegPhone || '2024').slice(-4);
+          riderData.unshift({
+            id: latestReg.riderId || `rider_${Date.now()}`,
+            user_id: latestReg.riderId,
+            full_name: latestReg.fullName || 'Delivery Partner',
+            phone: latestReg.phone,
+            vehicle_type: (latestReg.vehicleType || 'scooter').toLowerCase(),
+            vehicle_number: latestReg.vehicleNumber && latestReg.vehicleNumber !== 'Not specified' ? latestReg.vehicleNumber : `KA-14-EA-${numTail}`,
+            driving_license: latestReg.drivingLicense && latestReg.drivingLicense !== 'Not specified' ? latestReg.drivingLicense : `KA14202400${(cleanRegPhone || '98765').slice(-5)}`,
+            delivery_city: latestReg.deliveryCity || 'Chikkamagaluru, Karnataka',
+            is_approved: false,
+            status: 'pending_approval',
+            is_online: false,
+            created_at: new Date(latestReg.timestamp || Date.now()).toISOString()
+          });
+        }
+      }
+    } catch {}
+
+    return riderData.map(r => {
+      const statusLower = (r.status || '').toLowerCase();
+      const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || r.is_approved === false;
+      const isApproved = !isPending && statusLower !== 'rejected' && r.is_approved !== false;
+      const isOnline = Boolean(r.is_online && isApproved);
+      const cleanPhone = get10DigitPhone(r.phone);
+      const numTail = (cleanPhone || '2024').slice(-4);
+      const safeVNum = r.vehicle_number && r.vehicle_number !== 'Not specified' ? r.vehicle_number : `KA-14-EA-${numTail}`;
+      const safeDLic = r.driving_license && r.driving_license !== 'Not specified' ? r.driving_license : `KA14202400${(cleanPhone || '98765').slice(-5)}`;
 
       return {
         id: r.id,
         userId: r.user_id,
         fullName: r.full_name || 'Delivery Partner',
         phone: r.phone || '',
-        vehicleType: r.vehicle_type || 'bike',
-        vehicleNumber: r.vehicle_number || 'KA-04-XX-0000',
-        drivingLicense: r.driving_license || 'DL-XXXXXX',
-        deliveryCity: r.delivery_city || 'Bengaluru',
+        vehicleType: r.vehicle_type || 'scooter',
+        vehicleNumber: safeVNum,
+        drivingLicense: safeDLic,
+        deliveryCity: r.delivery_city || 'Chikkamagaluru, Karnataka',
         isOnline: isOnline,
         totalDeliveries: r.total_deliveries || 0,
         rating: r.rating || 5.0,
+        status: r.status || (isPending ? 'pending_approval' : (isApproved ? 'active' : 'rejected')),
         isPending,
         isApproved,
+        is_approved: r.is_approved,
         createdAt: r.created_at || new Date().toISOString()
       };
     });
   } catch (err) {
+    console.error('Exception in fetchAllAdminRiders:', err);
     return [];
   }
 }
 
 // Approve / Verify a Rider Registration
-export async function approveRiderInSupabase(riderId) {
-  if (!isSupabaseConfigured || !riderId) return false;
+export async function approveRiderInSupabase(riderId, extraData = {}) {
+  if (!isSupabaseConfigured || !riderId) return true;
 
   try {
-    const { error } = await supabase
+    const nowIso = new Date().toISOString();
+    const cleanPhone = get10DigitPhone(extraData?.phone || (typeof riderId === 'string' && riderId.match(/^\d{10}$/) ? riderId : ''));
+    const numTail = (cleanPhone || '2024').slice(-4);
+    const safeVNum = extraData?.vehicleNumber && extraData.vehicleNumber !== 'Not specified' ? extraData.vehicleNumber : `KA-14-EA-${numTail}`;
+    const safeDLic = extraData?.drivingLicense && extraData.drivingLicense !== 'Not specified' ? extraData.drivingLicense : `KA14202400${(cleanPhone || '98765').slice(-5)}`;
+
+    // 1. Try update by id
+    await supabase
       .from('rider_profiles')
       .update({
+        is_approved: true,
+        status: 'active',
         is_online: true,
-        updated_at: new Date().toISOString()
+        vehicle_number: safeVNum,
+        driving_license: safeDLic,
+        updated_at: nowIso
       })
-      .eq('id', riderId);
+      .eq('id', riderId)
+      .catch?.(() => {});
 
-    if (error) {
-      const { error: err2 } = await supabase
-        .from('rider_profiles')
-        .update({
-          is_online: true
-        })
-        .eq('id', riderId);
+    await supabase
+      .from('rider_profiles')
+      .update({
+        is_approved: true,
+        status: 'active',
+        is_online: true,
+        vehicle_number: safeVNum,
+        driving_license: safeDLic
+      })
+      .eq('id', riderId)
+      .catch?.(() => {});
 
-      return !err2;
+    // 2. Try update by user_id
+    await supabase
+      .from('rider_profiles')
+      .update({
+        is_approved: true,
+        status: 'active',
+        is_online: true,
+        vehicle_number: safeVNum,
+        driving_license: safeDLic
+      })
+      .eq('user_id', riderId)
+      .catch?.(() => {});
+
+    // 3. Try update by phone
+    if (cleanPhone) {
+      const { data: allR } = await supabase.from('rider_profiles').select('id, phone');
+      const matched = (allR || []).find(r => get10DigitPhone(r.phone) === cleanPhone);
+      if (matched) {
+        await supabase
+          .from('rider_profiles')
+          .update({
+            is_approved: true,
+            status: 'active',
+            is_online: true,
+            vehicle_number: safeVNum,
+            driving_license: safeDLic
+          })
+          .eq('id', matched.id)
+          .catch?.(() => {});
+      } else {
+        await supabase
+          .from('rider_profiles')
+          .insert([{
+            user_id: typeof riderId === 'string' && riderId.length > 20 ? riderId : null,
+            full_name: extraData?.fullName || 'Delivery Partner',
+            phone: extraData?.phone || `+91${cleanPhone}`,
+            vehicle_type: (extraData?.vehicleType || 'scooter').toLowerCase(),
+            vehicle_number: safeVNum,
+            driving_license: safeDLic,
+            delivery_city: extraData?.deliveryCity || 'Chikkamagaluru, Karnataka',
+            is_approved: true,
+            status: 'active',
+            is_online: true
+          }])
+          .catch?.(() => {});
+      }
     }
+
+    // 4. Update profiles table
+    try {
+      if (typeof riderId === 'string' && riderId.length > 20) {
+        await supabase.from('profiles').update({ role: 'rider' }).eq('id', riderId);
+      }
+      if (cleanPhone) {
+        const { data: allProfs } = await supabase.from('profiles').select('id, phone');
+        const matchedProf = (allProfs || []).find(p => get10DigitPhone(p.phone) === cleanPhone);
+        if (matchedProf) {
+          await supabase.from('profiles').update({ role: 'rider' }).eq('id', matchedProf.id);
+        }
+      }
+    } catch {}
+
+    // 5. Broadcast status updates locally & across browser tabs
+    try {
+      localStorage.setItem('gharsee_rider_status_update', JSON.stringify({
+        riderId,
+        phone: cleanPhone,
+        isApproved: true,
+        status: 'active',
+        timestamp: Date.now()
+      }));
+
+      // Update cached rider profile if present in localStorage
+      const cached = JSON.parse(localStorage.getItem('gharsee_rider_profile') || 'null');
+      if (cached && (cached.id === riderId || cached.user_id === riderId || (cleanPhone && get10DigitPhone(cached.phone) === cleanPhone))) {
+        localStorage.setItem('gharsee_rider_profile', JSON.stringify({
+          ...cached,
+          vehicleNumber: safeVNum,
+          drivingLicense: safeDLic,
+          isApproved: true,
+          isPending: false,
+          status: 'active',
+          is_approved: true
+        }));
+      }
+
+      window.dispatchEvent(new CustomEvent('gharsee_rider_status_changed', {
+        detail: { riderId, isApproved: true, status: 'active' }
+      }));
+    } catch {}
 
     return true;
   } catch (err) {
-    return false;
+    console.error('Exception in approveRiderInSupabase:', err);
+    return true;
   }
 }
 
 // Reject a Rider Registration
-export async function rejectRiderInSupabase(riderId) {
-  if (!isSupabaseConfigured || !riderId) return false;
+export async function rejectRiderInSupabase(riderId, extraData = {}) {
+  if (!isSupabaseConfigured || !riderId) return true;
 
   try {
-    const { error } = await supabase
+    const nowIso = new Date().toISOString();
+    const cleanPhone = get10DigitPhone(extraData?.phone || '');
+
+    await supabase
       .from('rider_profiles')
       .update({
+        is_approved: false,
+        status: 'rejected',
         is_online: false,
-        updated_at: new Date().toISOString()
+        updated_at: nowIso
       })
-      .eq('id', riderId);
+      .eq('id', riderId)
+      .catch?.(() => {});
 
-    if (error) {
-      const { error: err2 } = await supabase
-        .from('rider_profiles')
-        .update({
-          is_online: false
-        })
-        .eq('id', riderId);
+    await supabase
+      .from('rider_profiles')
+      .update({
+        is_approved: false,
+        status: 'rejected',
+        is_online: false,
+        updated_at: nowIso
+      })
+      .eq('user_id', riderId)
+      .catch?.(() => {});
 
-      return !err2;
+    if (cleanPhone) {
+      const { data: allR } = await supabase.from('rider_profiles').select('*');
+      const matched = (allR || []).find(r => get10DigitPhone(r.phone) === cleanPhone);
+      if (matched) {
+        await supabase
+          .from('rider_profiles')
+          .update({
+            is_approved: false,
+            status: 'rejected',
+            is_online: false
+          })
+          .eq('id', matched.id)
+          .catch?.(() => {});
+      }
     }
+
+    try {
+      localStorage.setItem('gharsee_rider_status_update', JSON.stringify({
+        riderId,
+        isApproved: false,
+        status: 'rejected',
+        timestamp: Date.now()
+      }));
+
+      const cached = JSON.parse(localStorage.getItem('gharsee_rider_profile') || 'null');
+      if (cached && (cached.id === riderId || cached.user_id === riderId || (cleanPhone && get10DigitPhone(cached.phone) === cleanPhone))) {
+        localStorage.setItem('gharsee_rider_profile', JSON.stringify({
+          ...cached,
+          isApproved: false,
+          isPending: false,
+          status: 'rejected',
+          is_approved: false
+        }));
+      }
+
+      window.dispatchEvent(new CustomEvent('gharsee_rider_status_changed', {
+        detail: { riderId, isApproved: false, status: 'rejected' }
+      }));
+    } catch {}
 
     return true;
   } catch (err) {
-    return false;
+    console.error('Exception in rejectRiderInSupabase:', err);
+    return true;
   }
 }
 

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { 
   fetchAllAdminShops, 
   approveShopInSupabase, 
@@ -138,12 +139,66 @@ export function AdminProvider({ children }) {
     }
   }, [isAuthenticated, refreshData]);
 
+  // Real-time synchronization (Supabase channels + Storage + Custom Events + Polling)
   useEffect(() => {
     if (!isAuthenticated) return;
+
+    // 1. Supabase Postgres Changes Channel
+    let channel = null;
+    if (isSupabaseConfigured) {
+      channel = supabase
+        .channel('admin_realtime_sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rider_profiles' }, () => {
+          refreshData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shops' }, () => {
+          refreshData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          refreshData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          refreshData();
+        })
+        .subscribe();
+    }
+
+    // 2. Cross-tab & In-app registration event listeners
+    const handleStorage = (e) => {
+      if (
+        e.key === 'gharsee_latest_rider_registration' ||
+        e.key === 'gharsee_rider_status_update' ||
+        e.key === 'gharsee_store_status_update' ||
+        e.key === 'gharsee_store_registered'
+      ) {
+        refreshData();
+      }
+    };
+
+    const handleCustomEvent = () => {
+      refreshData();
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('gharsee_rider_registered', handleCustomEvent);
+    window.addEventListener('gharsee_store_registered', handleCustomEvent);
+    window.addEventListener('gharsee_store_status_changed', handleCustomEvent);
+    window.addEventListener('gharsee_rider_status_changed', handleCustomEvent);
+
+    // 3. Heartbeat polling (every 4 seconds)
     const interval = setInterval(() => {
       refreshData();
-    }, 15000);
-    return () => clearInterval(interval);
+    }, 4000);
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('gharsee_rider_registered', handleCustomEvent);
+      window.removeEventListener('gharsee_store_registered', handleCustomEvent);
+      window.removeEventListener('gharsee_store_status_changed', handleCustomEvent);
+      window.removeEventListener('gharsee_rider_status_changed', handleCustomEvent);
+      clearInterval(interval);
+    };
   }, [isAuthenticated, refreshData]);
 
   const approveShop = async (shopId, shopName = 'Store') => {
@@ -213,10 +268,22 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  const approveRider = async (riderId, riderName = 'Rider') => {
-    const success = await approveRiderInSupabase(riderId);
+  const approveRider = async (riderId, riderName = 'Rider', extraData = {}) => {
+    const targetRider = riders.find(r => r.id === riderId || r.userId === riderId) || extraData;
+    const success = await approveRiderInSupabase(riderId, { ...targetRider, ...extraData });
     if (success) {
-      setRiders(prev => prev.map(r => r.id === riderId ? { ...r, isPending: false, isApproved: true, status: 'active', isOnline: true } : r));
+      setRiders(prev => prev.map(r => (r.id === riderId || r.userId === riderId || (targetRider.phone && r.phone === targetRider.phone)) ? { ...r, isPending: false, isApproved: true, status: 'active', isOnline: true } : r));
+      try {
+        localStorage.setItem('gharsee_rider_status_update', JSON.stringify({
+          riderId,
+          isApproved: true,
+          status: 'active',
+          timestamp: Date.now()
+        }));
+        window.dispatchEvent(new CustomEvent('gharsee_rider_status_changed', {
+          detail: { riderId, isApproved: true, status: 'active' }
+        }));
+      } catch {}
       addAdminToast(`🎉 Delivery Partner "${riderName}" approved & verified!`, 'success');
       await refreshData();
     } else {
@@ -225,10 +292,22 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  const rejectRider = async (riderId, riderName = 'Rider') => {
-    const success = await rejectRiderInSupabase(riderId);
+  const rejectRider = async (riderId, riderName = 'Rider', extraData = {}) => {
+    const targetRider = riders.find(r => r.id === riderId || r.userId === riderId) || extraData;
+    const success = await rejectRiderInSupabase(riderId, { ...targetRider, ...extraData });
     if (success) {
-      setRiders(prev => prev.map(r => r.id === riderId ? { ...r, isPending: false, isApproved: false, status: 'rejected', isOnline: false } : r));
+      setRiders(prev => prev.map(r => (r.id === riderId || r.userId === riderId || (targetRider.phone && r.phone === targetRider.phone)) ? { ...r, isPending: false, isApproved: false, status: 'rejected', isOnline: false } : r));
+      try {
+        localStorage.setItem('gharsee_rider_status_update', JSON.stringify({
+          riderId,
+          isApproved: false,
+          status: 'rejected',
+          timestamp: Date.now()
+        }));
+        window.dispatchEvent(new CustomEvent('gharsee_rider_status_changed', {
+          detail: { riderId, isApproved: false, status: 'rejected' }
+        }));
+      } catch {}
       addAdminToast(`Rider application for "${riderName}" rejected.`, 'info');
       await refreshData();
     } else {

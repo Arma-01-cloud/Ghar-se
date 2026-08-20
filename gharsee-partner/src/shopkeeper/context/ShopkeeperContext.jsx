@@ -38,7 +38,6 @@ export const ShopkeeperProvider = ({ children }) => {
 
   const [isCheckingStore, setIsCheckingStore] = useState(false);
 
-  // Store profile initialized to null (no mock Sri Lakshmi store fallback!)
   const [storeProfile, setStoreProfile] = useState(() => {
     try {
       const saved = localStorage.getItem('gharsee_store_profile');
@@ -48,7 +47,6 @@ export const ShopkeeperProvider = ({ children }) => {
     }
   });
 
-  // Initialize orders with localStorage backup for instant persistence across page refreshes
   const [orders, setOrders] = useState(() => {
     try {
       const saved = localStorage.getItem('gharsee_shopkeeper_orders');
@@ -64,7 +62,7 @@ export const ShopkeeperProvider = ({ children }) => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [toasts, setToasts] = useState([]);
 
-  // Query Supabase for store owned by authenticated user via 10-digit phone or owner_id
+  // Query Supabase for store owned by authenticated user via owner_id or 10-digit phone
   const loadUserStoreFromSupabase = async (userId, userPhone) => {
     if (!isSupabaseConfigured) return;
 
@@ -81,6 +79,14 @@ export const ShopkeeperProvider = ({ children }) => {
       }
 
       if (matchedShop) {
+        if (userId && (!matchedShop.owner_id || matchedShop.owner_id !== userId)) {
+          supabase
+            .from('shops')
+            .update({ owner_id: userId })
+            .eq('id', matchedShop.id)
+            .catch?.(() => {});
+        }
+
         setHasStore(true);
         const statusLower = (matchedShop.status || '').toLowerCase();
         const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matchedShop.is_approved === false;
@@ -132,29 +138,17 @@ export const ShopkeeperProvider = ({ children }) => {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
+          const userPhone = user.phone || user.user_metadata?.phone;
+
           setAuthUser(user);
           setIsLoggedIn(true);
           try { 
             localStorage.setItem('gharsee_shopkeeper_logged_in', 'true'); 
             localStorage.setItem('gharsee_shopkeeper_user', JSON.stringify(user));
           } catch {}
-          await loadUserStoreFromSupabase(user.id, user.phone || user.user_metadata?.phone);
-        } else {
-          // Check if custom mobile phone auth user was stored
-          const savedUserStr = localStorage.getItem('gharsee_shopkeeper_user');
-          if (savedUserStr) {
-            try {
-              const parsedUser = JSON.parse(savedUserStr);
-              if (parsedUser && parsedUser.phone) {
-                setAuthUser(parsedUser);
-                setIsLoggedIn(true);
-                await loadUserStoreFromSupabase(parsedUser.id, parsedUser.phone);
-                return;
-              }
-            } catch {}
-          }
 
-          // No active auth session -> Show Login page
+          await loadUserStoreFromSupabase(user.id, userPhone);
+        } else {
           setAuthUser(null);
           setIsLoggedIn(false);
           setHasStore(false);
@@ -189,6 +183,7 @@ export const ShopkeeperProvider = ({ children }) => {
           setStoreProfile(null);
           try {
             localStorage.removeItem('gharsee_shopkeeper_logged_in');
+            localStorage.removeItem('gharsee_shopkeeper_user');
             localStorage.removeItem('gharsee_has_store');
             localStorage.removeItem('gharsee_store_profile');
           } catch {}
@@ -211,7 +206,6 @@ export const ShopkeeperProvider = ({ children }) => {
         localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(live));
       } catch {}
 
-      // Build LIVE Notifications from real Supabase order pipeline
       const liveAlerts = live.slice(0, 10).map(o => ({
         id: `notif_${o.id}`,
         title: `Order #${o.id} • ${o.status.toUpperCase()}`,
@@ -244,7 +238,6 @@ export const ShopkeeperProvider = ({ children }) => {
       const orderChannel = supabase
         .channel(`public:orders:shopkeeper:${storeProfile.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-          // If order belongs to this shop, reload orders and alert shopkeeper
           const incomingStoreId = payload.new?.store_id || payload.old?.store_id;
           if (!incomingStoreId || incomingStoreId === storeProfile.id) {
             loadLiveOrders();
@@ -288,7 +281,7 @@ export const ShopkeeperProvider = ({ children }) => {
         ...prev, 
         isOpen: newStatus,
         is_open: newStatus,
-        status: newStatus ? 'open' : 'closed' 
+        status: newStatus ? 'open' : 'closed'
       };
 
       try { 
@@ -338,8 +331,13 @@ export const ShopkeeperProvider = ({ children }) => {
     addShopkeeperToast('Store profile updated successfully!', 'success');
   };
 
-  // Order Workflow Actions (Persisted directly to Supabase & localStorage)
+  // Order Workflow Actions
   const acceptOrder = async (orderId) => {
+    const target = orders.find(o => o.id === orderId);
+    if (!target || !storeProfile || String(target.storeId || target.store_id) !== String(storeProfile.id)) {
+      addShopkeeperToast('You can only update orders for your own store.', 'error');
+      return;
+    }
     const updated = orders.map(o => {
       if (o.id === orderId) return { ...o, status: 'accepted' };
       return o;
@@ -347,11 +345,16 @@ export const ShopkeeperProvider = ({ children }) => {
     setOrders(updated);
     try { localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(updated)); } catch {}
 
-    await updateOrderStatusInSupabase(orderId, 'accepted');
+    await updateOrderStatusInSupabase(orderId, 'accepted', null, storeProfile.id);
     addShopkeeperToast(`Order #${orderId} accepted successfully! ✓`, 'success');
   };
 
   const rejectOrder = async (orderId, reason) => {
+    const target = orders.find(o => o.id === orderId);
+    if (!target || !storeProfile || String(target.storeId || target.store_id) !== String(storeProfile.id)) {
+      addShopkeeperToast('You can only update orders for your own store.', 'error');
+      return;
+    }
     const updated = orders.map(o => {
       if (o.id === orderId) return { ...o, status: 'rejected', rejectionReason: reason };
       return o;
@@ -359,27 +362,31 @@ export const ShopkeeperProvider = ({ children }) => {
     setOrders(updated);
     try { localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(updated)); } catch {}
 
-    await updateOrderStatusInSupabase(orderId, 'rejected');
+    await updateOrderStatusInSupabase(orderId, 'rejected', null, storeProfile.id);
     addShopkeeperToast(`Order #${orderId} rejected.`, 'error');
   };
 
   const updateOrderStatus = async (orderId, nextStatus) => {
+    const target = orders.find(o => o.id === orderId);
+    if (!target || !storeProfile || String(target.storeId || target.store_id) !== String(storeProfile.id)) {
+      addShopkeeperToast('You can only update orders for your own store.', 'error');
+      return;
+    }
+    if (!validateStatusTransition(target.status, nextStatus)) {
+      addShopkeeperToast(`Invalid status transition: ${target.status} → ${nextStatus}`, 'error');
+      return;
+    }
     const updated = orders.map(o => {
-      if (o.id === orderId) {
-        if (validateStatusTransition(o.status, nextStatus)) {
-          return { ...o, status: nextStatus };
-        }
-      }
+      if (o.id === orderId) return { ...o, status: nextStatus };
       return o;
     });
     setOrders(updated);
     try { localStorage.setItem('gharsee_shopkeeper_orders', JSON.stringify(updated)); } catch {}
 
-    await updateOrderStatusInSupabase(orderId, nextStatus);
+    await updateOrderStatusInSupabase(orderId, nextStatus, null, storeProfile.id);
     addShopkeeperToast(`Order #${orderId} status updated to ${nextStatus.replace(/_/g, ' ').toUpperCase()}`, 'success');
   };
 
-  // Dashboard Stats Calculations
   const todayOrders = orders.length;
   const pendingOrders = orders.filter(o => o.status === 'pending');
   const preparingOrders = orders.filter(o => o.status === 'preparing');
@@ -422,7 +429,7 @@ export const ShopkeeperProvider = ({ children }) => {
       localStorage.removeItem('gharsee_shopkeeper_orders');
     } catch {}
     addShopkeeperToast('Logged out of Store Partner Portal', 'info');
-    window.location.href = '/shopkeeper';
+    window.location.href = '/';
   };
 
   return (

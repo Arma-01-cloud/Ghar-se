@@ -126,7 +126,7 @@ export const RiderProvider = ({ children }) => {
 
         const statusLower = (matched.status || '').toLowerCase();
         const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matched.is_approved === false;
-        const isApproved = !isPending && statusLower !== 'rejected';
+        const isApproved = !isPending && statusLower !== 'rejected' && matched.is_approved !== false;
 
         const liveProfile = {
           id: matched.id,
@@ -142,8 +142,9 @@ export const RiderProvider = ({ children }) => {
           vehicleNumber: matched.vehicle_number || matched.vehicleNumber || 'Not specified',
           drivingLicense: matched.driving_license || matched.drivingLicense || 'Not specified',
           city: matched.delivery_city || matched.city || 'Chikkamagaluru, Karnataka',
+          deliveryCity: matched.delivery_city || matched.city || 'Chikkamagaluru, Karnataka',
           avatar: '/images/hero_grocery.jpg',
-          status: matched.status,
+          status: matched.status || (isPending ? 'pending_approval' : 'active'),
           isApproved: isApproved,
           isPending: isPending,
           is_approved: matched.is_approved,
@@ -159,6 +160,12 @@ export const RiderProvider = ({ children }) => {
     } catch (err) {
       console.error('Error fetching rider_profiles from Supabase:', err);
     }
+  };
+
+  const refreshRiderProfile = async () => {
+    const userId = authUser?.id;
+    const userPhone = authUser?.phone || authUser?.user_metadata?.phone || profile?.phone;
+    await loadRiderProfileFromSupabase(userId, userPhone);
   };
 
   // Check Supabase Authentication session for Rider
@@ -223,6 +230,71 @@ export const RiderProvider = ({ children }) => {
       };
     }
   }, []);
+
+  // Listen for external rider status change events (from Admin actions)
+  useEffect(() => {
+    const handleStatusChange = () => {
+      refreshRiderProfile();
+    };
+    window.addEventListener('gharsee_rider_status_changed', handleStatusChange);
+    window.addEventListener('storage', handleStatusChange);
+    return () => {
+      window.removeEventListener('gharsee_rider_status_changed', handleStatusChange);
+      window.removeEventListener('storage', handleStatusChange);
+    };
+  }, [authUser, profile?.id]);
+
+  // Realtime Supabase listener on rider_profiles table for instant unlock when admin approves
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile?.id) return;
+
+    const profileChannel = supabase
+      .channel(`public:rider_profiles:${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rider_profiles',
+          filter: `id=eq.${profile.id}`
+        },
+        (payload) => {
+          if (payload.new) {
+            const newStatus = (payload.new.status || '').toLowerCase();
+            const newIsPending = newStatus === 'pending_approval' || newStatus === 'pending' || payload.new.is_approved === false;
+            const newIsApproved = !newIsPending && newStatus !== 'rejected' && payload.new.is_approved !== false;
+            
+            setProfile(prev => {
+              const updated = {
+                ...prev,
+                ...payload.new,
+                fullName: payload.new.full_name || prev?.fullName,
+                vehicleType: payload.new.vehicle_type || prev?.vehicleType,
+                vehicleNumber: payload.new.vehicle_number || prev?.vehicleNumber,
+                drivingLicense: payload.new.driving_license || prev?.drivingLicense,
+                deliveryCity: payload.new.delivery_city || prev?.deliveryCity,
+                status: payload.new.status,
+                is_approved: payload.new.is_approved,
+                isPending: newIsPending,
+                isApproved: newIsApproved,
+                isOnline: newIsApproved ? Boolean(payload.new.is_online) : false
+              };
+              try { localStorage.setItem('gharsee_rider_profile', JSON.stringify(updated)); } catch {}
+              return updated;
+            });
+
+            if (newIsApproved) {
+              addRiderToast('🎉 Your Rider account has been approved by Admin! Welcome to UR GROZY Delivery Partner!', 'success');
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileChannel);
+    };
+  }, [profile?.id]);
 
   // Load live delivery tasks & calculate real earnings from Supabase (Strictly filtered by rider_id)
   useEffect(() => {
@@ -561,37 +633,47 @@ export const RiderProvider = ({ children }) => {
   };
 
   const loginRider = async (userObj) => {
+    const isPending = Boolean(userObj?.isPending || userObj?.status === 'pending_approval' || userObj?.status === 'pending' || userObj?.is_approved === false || userObj?.isApproved === false);
+    const isApproved = !isPending;
+
+    const riderPhone = userObj?.phone || userObj?.user_metadata?.phone;
+    const liveProfile = {
+      id: userObj.id,
+      user_id: userObj.id || userObj.user_id,
+      name: userObj.full_name || userObj.user_metadata?.full_name || userObj.name || 'Delivery Partner',
+      fullName: userObj.full_name || userObj.user_metadata?.full_name || userObj.name || 'Delivery Partner',
+      phone: riderPhone || '+91 81238 21300',
+      email: `${get10DigitPhone(riderPhone || '8123821300')}@urgrozy.app`,
+      rating: userObj.rating || 5.0,
+      totalDeliveries: userObj.total_deliveries || 0,
+      memberSince: 'Recently Joined',
+      vehicleType: userObj.vehicle_type || userObj.vehicleType || 'Scooter',
+      vehicleNumber: userObj.vehicle_number || userObj.vehicleNumber || 'Not specified',
+      drivingLicense: userObj.driving_license || userObj.drivingLicense || 'Not specified',
+      city: userObj.delivery_city || userObj.city || 'Chikkamagaluru, Karnataka',
+      deliveryCity: userObj.delivery_city || userObj.city || 'Chikkamagaluru, Karnataka',
+      avatar: '/images/hero_grocery.jpg',
+      status: userObj.status || (isPending ? 'pending_approval' : 'active'),
+      isPending: isPending,
+      isApproved: isApproved,
+      is_approved: userObj.is_approved !== undefined ? userObj.is_approved : isApproved,
+      isOnline: isApproved ? Boolean(userObj.is_online || userObj.isOnline) : false
+    };
+
     setAuthUser(userObj);
     setIsLoggedIn(true);
-    setIsOnline(true);
+    setProfile(liveProfile);
+    setIsOnline(liveProfile.isOnline);
     try {
       localStorage.setItem('gharsee_rider_logged_in', 'true');
+      localStorage.setItem('gharsee_rider_profile', JSON.stringify(liveProfile));
     } catch {}
 
-    const riderPhone = userObj.phone || userObj.user_metadata?.phone;
     if (riderPhone) {
-      await updateRiderOnlineStatusInSupabase(riderPhone, true, userObj.id);
+      if (isApproved) {
+        await updateRiderOnlineStatusInSupabase(riderPhone, true, userObj.id);
+      }
       await loadRiderProfileFromSupabase(userObj.id, riderPhone);
-    } else {
-      const liveProfile = {
-        id: userObj.id,
-        name: userObj.full_name || userObj.user_metadata?.full_name || userObj.name || 'Delivery Partner',
-        phone: userObj.phone || '+91 81238 21300',
-        email: `${get10DigitPhone(userObj.phone || '8123821300')}@urgrozy.app`,
-        rating: userObj.rating || 5.0,
-        totalDeliveries: userObj.total_deliveries || 0,
-        memberSince: 'Recently Joined',
-        vehicleType: userObj.vehicle_type || userObj.vehicleType || 'Scooter',
-        vehicleNumber: userObj.vehicle_number || userObj.vehicleNumber || 'Not specified',
-        drivingLicense: userObj.driving_license || userObj.drivingLicense || 'Not specified',
-        city: userObj.delivery_city || userObj.city || 'Chikkamagaluru, Karnataka',
-        avatar: '/images/hero_grocery.jpg',
-        isOnline: true
-      };
-      setProfile(liveProfile);
-      try {
-        localStorage.setItem('gharsee_rider_profile', JSON.stringify(liveProfile));
-      } catch {}
     }
   };
 
@@ -633,6 +715,8 @@ export const RiderProvider = ({ children }) => {
         earnings,
         history,
         profile,
+        riderProfile: profile,
+        refreshRiderProfile,
         notifications,
         activeRiderTab,
         toasts,

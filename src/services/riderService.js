@@ -69,7 +69,11 @@ export async function signUpRiderInSupabase({
       phone: normalizedPhone,
       password,
       fullName: safeFullName,
-      role: 'rider'
+      role: 'rider',
+      vehicleType,
+      vehicleNumber,
+      drivingLicense,
+      deliveryCity
     });
 
     if (authRes.error || !authRes.user) {
@@ -78,7 +82,22 @@ export async function signUpRiderInSupabase({
 
     const authUser = authRes.user;
 
-    // 2. Check if rider profile row with this phone already exists in rider_profiles
+    // 2. Guarantee profile row in public.profiles
+    try {
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: authUser.id,
+          phone: normalizedPhone,
+          full_name: safeFullName,
+          role: 'rider',
+          updated_at: new Date().toISOString()
+        });
+    } catch (profErr) {
+      console.warn('Profile ensure in rider registration:', profErr);
+    }
+
+    // 3. Check if rider profile row with this phone already exists in rider_profiles
     const { data: allRiders } = await supabase.from('rider_profiles').select('*');
     const existingRider = (allRiders || []).find(r => get10DigitPhone(r.phone) === cleanDigits);
 
@@ -91,12 +110,12 @@ export async function signUpRiderInSupabase({
       driving_license: drivingLicense.trim().toUpperCase(),
       delivery_city: deliveryCity,
       is_online: false,
-      is_approved: true,
-      status: 'active'
+      is_approved: false,
+      status: 'pending_approval'
     };
 
     if (existingRider) {
-      // Update existing record with user_id
+      // Update existing record with user_id & updated vehicle details in pending status
       await supabase
         .from('rider_profiles')
         .update(riderPayload)
@@ -109,16 +128,21 @@ export async function signUpRiderInSupabase({
         fullName: safeFullName,
         name: safeFullName,
         role: 'rider',
+        vehicleType: vehicleType,
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
+        drivingLicense: drivingLicense.trim().toUpperCase(),
+        deliveryCity: deliveryCity,
         isOnline: false,
-        isPending: false,
-        isApproved: true,
-        status: 'active',
+        isPending: true,
+        isApproved: false,
+        is_approved: false,
+        status: 'pending_approval',
         ...riderPayload
       };
       return { user: riderUser, error: null };
     }
 
-    // Insert new rider profile
+    // Insert new rider profile with pending approval state
     const { data: newRider, error: insertErr } = await supabase
       .from('rider_profiles')
       .insert([riderPayload])
@@ -126,12 +150,26 @@ export async function signUpRiderInSupabase({
       .maybeSingle();
 
     if (insertErr) {
-      console.warn('Full rider payload insert failed, retrying minimal payload:', insertErr.message);
+      console.warn('Full rider payload insert failed, retrying with foreign-key resilience:', insertErr.message);
+
+      const isFkError = Boolean(
+        insertErr.message?.includes('foreign key') || 
+        insertErr.message?.includes('rider_profiles_user_id_fkey') ||
+        insertErr.code === '23503'
+      );
+
+      const safeUserId = isFkError ? null : authUser.id;
 
       const minimalPayload = {
-        user_id: authUser.id,
+        user_id: safeUserId,
         full_name: safeFullName,
         phone: normalizedPhone,
+        vehicle_type: vehicleType,
+        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        driving_license: drivingLicense.trim().toUpperCase(),
+        delivery_city: deliveryCity,
+        is_approved: false,
+        status: 'pending_approval',
         is_online: false
       };
 
@@ -152,10 +190,15 @@ export async function signUpRiderInSupabase({
         fullName: safeFullName,
         name: safeFullName,
         role: 'rider',
+        vehicleType: vehicleType,
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
+        drivingLicense: drivingLicense.trim().toUpperCase(),
+        deliveryCity: deliveryCity,
         isOnline: false,
-        isPending: false,
-        isApproved: true,
-        status: 'active'
+        isPending: true,
+        isApproved: false,
+        is_approved: false,
+        status: 'pending_approval'
       };
       return { user: riderUser, error: null };
     }
@@ -167,12 +210,27 @@ export async function signUpRiderInSupabase({
       fullName: safeFullName,
       name: safeFullName,
       role: 'rider',
+      vehicleType: vehicleType,
+      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+      drivingLicense: drivingLicense.trim().toUpperCase(),
+      deliveryCity: deliveryCity,
       isOnline: false,
-      isPending: false,
-      isApproved: true,
-      status: 'active',
+      isPending: true,
+      isApproved: false,
+      is_approved: false,
+      status: 'pending_approval',
       ...newRider
     };
+
+    try {
+      localStorage.setItem('gharsee_latest_rider_registration', JSON.stringify({
+        riderId: riderUser.id,
+        phone: riderUser.phone,
+        fullName: riderUser.fullName,
+        timestamp: Date.now()
+      }));
+      window.dispatchEvent(new CustomEvent('gharsee_rider_registered', { detail: { rider: riderUser } }));
+    } catch {}
 
     return { user: riderUser, error: null };
   } catch (err) {
@@ -213,11 +271,18 @@ export async function signInRiderWithPhone({ phone, password }) {
     const { data: riders } = await supabase.from('rider_profiles').select('*');
     let matchedRider = (riders || []).find(r => (authUser.id && r.user_id === authUser.id) || (get10DigitPhone(r.phone) === cleanDigits));
 
+    const statusLower = (matchedRider?.status || '').toLowerCase();
+    const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matchedRider?.is_approved === false;
+    const isApproved = !isPending && statusLower !== 'rejected' && matchedRider?.is_approved !== false;
+
     if (matchedRider) {
-      // Ensure user_id and online status are synced
+      const updateData = { user_id: authUser.id };
+      if (isApproved) {
+        updateData.is_online = true;
+      }
       await supabase
         .from('rider_profiles')
-        .update({ user_id: authUser.id, is_online: true })
+        .update(updateData)
         .eq('id', matchedRider.id)
         .catch?.(() => {});
     }
@@ -229,8 +294,16 @@ export async function signInRiderWithPhone({ phone, password }) {
       fullName: matchedRider?.full_name || authUser.user_metadata?.full_name || 'Delivery Partner',
       name: matchedRider?.full_name || authUser.user_metadata?.full_name || 'Delivery Partner',
       role: 'rider',
-      is_online: true,
-      isOnline: true,
+      vehicleType: matchedRider?.vehicle_type || 'Scooter',
+      vehicleNumber: matchedRider?.vehicle_number || 'Not specified',
+      drivingLicense: matchedRider?.driving_license || 'Not specified',
+      deliveryCity: matchedRider?.delivery_city || 'Chikkamagaluru, Karnataka',
+      status: matchedRider?.status || (isPending ? 'pending_approval' : 'active'),
+      isPending: isPending,
+      isApproved: isApproved,
+      is_approved: matchedRider ? matchedRider.is_approved : true,
+      is_online: isApproved ? Boolean(matchedRider?.is_online) : false,
+      isOnline: isApproved ? Boolean(matchedRider?.is_online) : false,
       ...matchedRider
     };
 

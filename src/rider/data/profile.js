@@ -1,7 +1,8 @@
 export const INITIAL_RIDER_PROFILE = {
   name: 'Delivery Partner',
-  phone: '+91 81238 21300',
-  email: 'partner@urgrozy.com',
+  fullName: 'Delivery Partner',
+  phone: '',
+  email: '',
   rating: 5.0,
   totalDeliveries: 0,
   memberSince: 'Recently Joined',
@@ -9,5 +10,11 @@ export const INITIAL_RIDER_PROFILE = {
   vehicleNumber: 'Not specified',
   drivingLicense: 'Not specified',
   city: 'Chikkamagaluru, Karnataka',
-  avatar: '/images/hero_grocery.jpg'
+  deliveryCity: 'Chikkamagaluru, Karnataka',
+  avatar: '/images/hero_grocery.jpg',
+  isPending: true,
+  isApproved: false,
+  is_approved: false,
+  status: 'pending_approval',
+  isOnline: false
 };

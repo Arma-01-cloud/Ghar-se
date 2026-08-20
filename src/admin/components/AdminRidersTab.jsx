@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { 
   Bike, Search, CheckCircle2, XCircle, Phone, 
-  AlertTriangle, ShieldCheck, FileText, MapPin
+  AlertTriangle, ShieldCheck, FileText, MapPin, 
+  ExternalLink, Eye, X, Calendar, Award
 } from 'lucide-react';
 
 export default function AdminRidersTab() {
   const { riders, approveRider, rejectRider } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'pending' | 'active' | 'online'
+  const [selectedRider, setSelectedRider] = useState(null);
 
   const filteredRiders = riders.filter((r) => {
     const q = searchQuery.toLowerCase().trim();
@@ -30,7 +32,7 @@ export default function AdminRidersTab() {
   const pendingCount = riders.filter(r => r.isPending).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       
       {/* HEADER & CONTROLS */}
       <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
@@ -41,7 +43,7 @@ export default function AdminRidersTab() {
               <span>Delivery Fleet & Rider Verification ({riders.length})</span>
             </h2>
             <p className="text-xs text-stone-500 font-medium mt-1">
-              Verify driving licenses, vehicle numbers, and approve riders before they can receive delivery requests.
+              Verify driving licenses, vehicle numbers, and approve riders before they can receive live delivery requests.
             </p>
           </div>
 
@@ -147,7 +149,8 @@ export default function AdminRidersTab() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-display font-black text-stone-900 text-base truncate">{rider.fullName}</h3>
                       {rider.isPending ? (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 shrink-0 flex items-center gap-1">
+                          <AlertTriangle className="w-2.5 h-2.5" />
                           PENDING
                         </span>
                       ) : rider.isOnline ? (
@@ -162,7 +165,7 @@ export default function AdminRidersTab() {
                     </div>
                     <p className="text-xs text-stone-500 flex items-center gap-1 mt-1 font-medium">
                       <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span>{rider.phone}</span>
+                      <span>{rider.phone || 'No phone'}</span>
                     </p>
                   </div>
 
@@ -174,12 +177,12 @@ export default function AdminRidersTab() {
                 {/* VEHICLE & LICENSE DETAILS */}
                 <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200/80 text-xs space-y-2 text-stone-700">
                   <div className="flex items-center justify-between">
-                    <span className="text-stone-500 font-medium">Vehicle Type:</span>
+                    <span className="text-stone-500 font-medium">Vehicle:</span>
                     <span className="font-extrabold uppercase text-emerald-800">{rider.vehicleType}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-stone-500 font-medium">Vehicle Number:</span>
+                    <span className="text-stone-500 font-medium">Reg Number:</span>
                     <span className="font-mono font-bold text-stone-900 uppercase">{rider.vehicleNumber}</span>
                   </div>
 
@@ -188,7 +191,7 @@ export default function AdminRidersTab() {
                       <FileText className="w-3 h-3 text-stone-400" />
                       <span>License ID:</span>
                     </span>
-                    <span className="font-mono font-semibold text-stone-800">{rider.drivingLicense}</span>
+                    <span className="font-mono font-semibold text-stone-800 uppercase">{rider.drivingLicense}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -196,17 +199,27 @@ export default function AdminRidersTab() {
                       <MapPin className="w-3 h-3 text-stone-400" />
                       <span>City:</span>
                     </span>
-                    <span className="font-bold text-stone-800">{rider.deliveryCity}</span>
+                    <span className="font-bold text-stone-800 truncate max-w-[140px]">{rider.deliveryCity}</span>
                   </div>
                 </div>
               </div>
 
-              {/* ACTION BUTTONS */}
-              <div>
+              {/* ACTION BUTTONS & VIEW INFO */}
+              <div className="space-y-2 pt-2 border-t border-stone-100">
+                
+                {/* VIEW RIDER INFO BUTTON */}
+                <button
+                  onClick={() => setSelectedRider(rider)}
+                  className="w-full py-2 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5 text-stone-600" />
+                  <span>View Rider Details</span>
+                </button>
+
                 {rider.isPending ? (
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-stone-100">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => rejectRider(rider.id, rider.fullName)}
+                      onClick={() => rejectRider(rider.id, rider.fullName, rider)}
                       className="py-2 px-3 rounded-xl bg-white hover:bg-rose-50 text-stone-700 hover:text-rose-700 border border-stone-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <XCircle className="w-4 h-4 text-rose-500" />
@@ -214,7 +227,7 @@ export default function AdminRidersTab() {
                     </button>
 
                     <button
-                      onClick={() => approveRider(rider.id, rider.fullName)}
+                      onClick={() => approveRider(rider.id, rider.fullName, rider)}
                       className="py-2 px-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -222,7 +235,7 @@ export default function AdminRidersTab() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between pt-3 border-t border-stone-100 text-xs text-stone-600">
+                  <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
                     <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
                       <ShieldCheck className="w-4 h-4 text-emerald-700" />
                       <span>Verified Partner</span>
@@ -234,6 +247,177 @@ export default function AdminRidersTab() {
 
             </div>
           ))}
+        </div>
+      )}
+
+      {/* DETAILED RIDER INFO INSPECTION MODAL */}
+      {selectedRider && (
+        <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* MODAL HEADER */}
+            <div className="p-6 bg-gradient-to-r from-emerald-900 to-stone-900 text-white flex items-center justify-between relative">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-emerald-400">
+                  <Bike className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-xl leading-tight">{selectedRider.fullName}</h3>
+                  <p className="text-emerald-300 text-xs font-semibold">Delivery Partner Application</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRider(null)}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* MODAL BODY */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              
+              {/* STATUS BANNER */}
+              <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs font-bold ${
+                selectedRider.isPending
+                  ? 'bg-amber-50 border-amber-200 text-amber-900'
+                  : selectedRider.status === 'active'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>
+                    {selectedRider.isPending ? '⏳ PENDING ADMIN VERIFICATION' : selectedRider.status === 'active' ? '✅ VERIFIED & ACTIVE' : '❌ APPLICATION REJECTED'}
+                  </span>
+                </div>
+                <span className="text-stone-700">⭐ {selectedRider.rating} Rating</span>
+              </div>
+
+              {/* RIDER PROFILE DATA SHEET */}
+              <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium">Full Name:</span>
+                  <span className="font-black text-stone-900 text-sm">{selectedRider.fullName}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium">Contact Phone:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-stone-900">{selectedRider.phone}</span>
+                    <a
+                      href={`tel:${selectedRider.phone}`}
+                      className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 font-bold hover:bg-emerald-200 transition-colors flex items-center gap-1"
+                    >
+                      <Phone className="w-3 h-3" />
+                      <span>Call</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium">Vehicle Type:</span>
+                  <span className="font-extrabold uppercase text-emerald-800">{selectedRider.vehicleType}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium">Vehicle Registration Plate:</span>
+                  <span className="font-mono font-black px-2 py-0.5 rounded-md bg-stone-900 text-amber-400 uppercase tracking-wide">
+                    {selectedRider.vehicleNumber}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Driving License Number:</span>
+                  </span>
+                  <span className="font-mono font-bold px-2 py-0.5 rounded-md bg-stone-200 text-stone-900 uppercase">
+                    {selectedRider.drivingLicense}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Operating City:</span>
+                  </span>
+                  <span className="font-bold text-stone-800">{selectedRider.deliveryCity}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                  <span className="text-stone-500 font-medium flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Total Deliveries Completed:</span>
+                  </span>
+                  <span className="font-bold text-stone-900">{selectedRider.totalDeliveries || 0} Orders</span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-stone-500 font-medium flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Application Date:</span>
+                  </span>
+                  <span className="font-medium text-stone-600">
+                    {new Date(selectedRider.createdAt).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short'
+                    })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* MODAL FOOTER ACTIONS */}
+            <div className="p-5 bg-stone-50 border-t border-stone-200 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setSelectedRider(null)}
+                className="py-2.5 px-4 rounded-xl bg-white border border-stone-300 hover:bg-stone-100 text-stone-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+
+              <div className="flex items-center gap-2">
+                {selectedRider.isPending ? (
+                  <>
+                    <button
+                      onClick={async () => {
+                        await rejectRider(selectedRider.id, selectedRider.fullName, selectedRider);
+                        setSelectedRider(null);
+                      }}
+                      className="py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span>Reject Application</span>
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        await approveRider(selectedRider.id, selectedRider.fullName, selectedRider);
+                        setSelectedRider(null);
+                      }}
+                      className="py-2.5 px-5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Approve & Activate Rider</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      await rejectRider(selectedRider.id, selectedRider.fullName);
+                      setSelectedRider(null);
+                    }}
+                    className="py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>Revoke Verification</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 

@@ -13,12 +13,13 @@ import RiderSettingsPage from './RiderSettingsPage';
 import RiderToastContainer from './RiderToastContainer';
 import RiderIncomingRequestModal from './RiderIncomingRequestModal';
 import RiderPendingApprovalView from './RiderPendingApprovalView';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 export default function RiderLayout() {
   const { 
     authUser,
     isLoggedIn, 
+    isCheckingAuth,
     profile,
     activeRiderTab, 
     incomingNotification, 
@@ -26,6 +27,19 @@ export default function RiderLayout() {
     declineIncomingNotification,
     logoutRider
   } = useRider();
+
+  // 1. Loading state while verifying Supabase authentication & rider profile
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#FBF9F5] flex flex-col items-center justify-center space-y-4 font-sans">
+        <Loader2 className="w-12 h-12 text-emerald-700 animate-spin" />
+        <div className="text-center space-y-1">
+          <h3 className="font-display font-extrabold text-stone-900 text-lg">Connecting to Rider Network</h3>
+          <p className="text-stone-500 text-xs">Checking authorization & delivery profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isLoggedIn) {
     return <RiderLogin />;
@@ -63,16 +77,18 @@ export default function RiderLayout() {
     );
   }
 
-  // Rider Pending Admin Review Gate
-  const isPendingApproval = profile && (
-    profile.isPending ||
-    profile.status === 'pending_approval' ||
-    profile.status === 'pending' ||
-    profile.is_approved === false ||
-    profile.isApproved === false
+  // Strict Rider Verification Gate: Rider MUST be explicitly approved by Admin to enter dashboard
+  const isApproved = Boolean(
+    profile &&
+    (profile.is_approved === true || profile.isApproved === true) &&
+    (profile.status === 'active' || !profile.status) &&
+    !profile.isPending &&
+    profile.status !== 'pending_approval' &&
+    profile.status !== 'pending' &&
+    profile.status !== 'rejected'
   );
 
-  if (isPendingApproval) {
+  if (!isApproved) {
     return <RiderPendingApprovalView onLogout={logoutRider} />;
   }
 
