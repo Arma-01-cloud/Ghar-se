@@ -63,7 +63,7 @@ class ShopkeeperErrorBoundary extends Component {
 }
 
 function ShopkeeperLayoutInner() {
-  const { isLoggedIn, hasStore, storeProfile, isCheckingStore, activeShopkeeperTab, setActiveShopkeeperTab, setSelectedOrderId, logoutShopkeeper } = useShopkeeper();
+  const { authUser, isLoggedIn, hasStore, storeProfile, isCheckingStore, activeShopkeeperTab, setActiveShopkeeperTab, setSelectedOrderId, logoutShopkeeper } = useShopkeeper();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Check URL params for embedded orderId from WhatsApp link
@@ -80,6 +80,38 @@ function ShopkeeperLayoutInner() {
 
   if (!isLoggedIn) {
     return <ShopkeeperLogin />;
+  }
+
+  // Role segregation check
+  const userRole = authUser?.user_metadata?.role || authUser?.role;
+  if (userRole === 'rider') {
+    return (
+      <div className="min-h-screen bg-[#FBF9F5] flex flex-col items-center justify-center p-6 text-center space-y-4 font-sans">
+        <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto shadow-inner">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <div className="space-y-1 max-w-md">
+          <h2 className="font-display font-extrabold text-2xl text-stone-900">Delivery Partner Account Detected</h2>
+          <p className="text-stone-600 text-xs sm:text-sm">
+            You are currently signed in with a <b>Delivery Partner (Rider)</b> account. To access the Store Partner Portal, please switch to a shopkeeper account.
+          </p>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={logoutShopkeeper}
+            className="py-3 px-6 bg-stone-200 hover:bg-stone-300 text-stone-800 font-extrabold text-xs rounded-2xl transition-all cursor-pointer"
+          >
+            Switch Account
+          </button>
+          <a
+            href="/rider"
+            className="py-3 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-lg transition-all"
+          >
+            Open Rider Portal
+          </a>
+        </div>
+      </div>
+    );
   }
 
   // 1. LOADING STATE WHILE CHECKING STORE REGISTRATION IN SUPABASE

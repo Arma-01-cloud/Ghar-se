@@ -167,6 +167,17 @@ export function AdminProvider({ children }) {
     const success = await approveShopInSupabase(shopId);
     if (success) {
       setShops(prev => prev.map(s => s.id === shopId ? { ...s, isPending: false, isApproved: true, status: 'open', isOpen: true } : s));
+      try {
+        localStorage.setItem('gharsee_store_status_update', JSON.stringify({
+          storeId: shopId,
+          isOpen: true,
+          status: 'open',
+          timestamp: Date.now()
+        }));
+        window.dispatchEvent(new CustomEvent('gharsee_store_status_changed', {
+          detail: { storeId: shopId, isOpen: true, status: 'open' }
+        }));
+      } catch {}
       addAdminToast(`🎉 Store "${shopName}" approved & open on customer app!`, 'success');
       try {
         confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 } });
@@ -183,6 +194,17 @@ export function AdminProvider({ children }) {
     const success = await rejectShopInSupabase(shopId, reason);
     if (success) {
       setShops(prev => prev.map(s => s.id === shopId ? { ...s, isPending: false, isApproved: false, status: 'rejected', isOpen: false } : s));
+      try {
+        localStorage.setItem('gharsee_store_status_update', JSON.stringify({
+          storeId: shopId,
+          isOpen: false,
+          status: 'rejected',
+          timestamp: Date.now()
+        }));
+        window.dispatchEvent(new CustomEvent('gharsee_store_status_changed', {
+          detail: { storeId: shopId, isOpen: false, status: 'rejected' }
+        }));
+      } catch {}
       addAdminToast(`Store "${shopName}" rejected.`, 'info');
       await refreshData();
     } else {
@@ -197,6 +219,17 @@ export function AdminProvider({ children }) {
     const success = await toggleShopStatusInSupabase(shopId, currentIsOpen);
     if (success) {
       setShops(prev => prev.map(s => s.id === shopId ? { ...s, isOpen: nextState, status: nextState ? 'open' : 'closed' } : s));
+      try {
+        localStorage.setItem('gharsee_store_status_update', JSON.stringify({
+          storeId: shopId,
+          isOpen: nextState,
+          status: nextState ? 'open' : 'closed',
+          timestamp: Date.now()
+        }));
+        window.dispatchEvent(new CustomEvent('gharsee_store_status_changed', {
+          detail: { storeId: shopId, isOpen: nextState, status: nextState ? 'open' : 'closed' }
+        }));
+      } catch {}
       addAdminToast(`Store status updated: ${nextState ? '🟢 OPEN' : '🔴 CLOSED'}`, 'info');
     }
     return success;

@@ -13,9 +13,11 @@ import RiderSettingsPage from './RiderSettingsPage';
 import RiderToastContainer from './RiderToastContainer';
 import RiderIncomingRequestModal from './RiderIncomingRequestModal';
 import RiderPendingApprovalView from './RiderPendingApprovalView';
+import { AlertCircle } from 'lucide-react';
 
 export default function RiderLayout() {
   const { 
+    authUser,
     isLoggedIn, 
     profile,
     activeRiderTab, 
@@ -27,6 +29,38 @@ export default function RiderLayout() {
 
   if (!isLoggedIn) {
     return <RiderLogin />;
+  }
+
+  // Role segregation check
+  const userRole = authUser?.user_metadata?.role || authUser?.role;
+  if (userRole === 'shopkeeper') {
+    return (
+      <div className="min-h-screen bg-[#FBF9F5] flex flex-col items-center justify-center p-6 text-center space-y-4 font-sans">
+        <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto shadow-inner">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <div className="space-y-1 max-w-md">
+          <h2 className="font-display font-extrabold text-2xl text-stone-900">Store Partner Account Detected</h2>
+          <p className="text-stone-600 text-xs sm:text-sm">
+            You are currently signed in with a <b>Store Partner (Shopkeeper)</b> account. To access the Delivery Partner App, please switch to a rider account.
+          </p>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={logoutRider}
+            className="py-3 px-6 bg-stone-200 hover:bg-stone-300 text-stone-800 font-extrabold text-xs rounded-2xl transition-all cursor-pointer"
+          >
+            Switch Account
+          </button>
+          <a
+            href="/shopkeeper"
+            className="py-3 px-6 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-lg transition-all"
+          >
+            Open Store Portal
+          </a>
+        </div>
+      </div>
+    );
   }
 
   // Rider Pending Admin Review Gate

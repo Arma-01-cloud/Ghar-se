@@ -22,6 +22,11 @@ export default function ShopkeeperLogin() {
       return;
     }
 
+    if (mode === 'signup' && password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+
     if (mode === 'signup' && password !== confirmPassword) {
       setErrorMsg('Passwords do not match. Please check and try again.');
       return;

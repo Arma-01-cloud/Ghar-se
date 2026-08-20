@@ -105,7 +105,6 @@ export async function signUpUserWithPhone({
           longitude: longitude != null ? parseFloat(longitude) : 77.6408,
           status: 'pending_approval',
           is_open: false,
-          is_approved: false,
           image_url: imageUrl || '/images/store_lakshmi.jpg'
         }])
         .select()

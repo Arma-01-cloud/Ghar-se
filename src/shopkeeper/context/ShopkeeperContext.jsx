@@ -64,7 +64,7 @@ export const ShopkeeperProvider = ({ children }) => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [toasts, setToasts] = useState([]);
 
-  // Query Supabase for store owned by authenticated user via 10-digit phone or owner_id
+  // Query Supabase for store owned by authenticated user via owner_id or 10-digit phone
   const loadUserStoreFromSupabase = async (userId, userPhone) => {
     if (!isSupabaseConfigured) return;
 
@@ -81,6 +81,15 @@ export const ShopkeeperProvider = ({ children }) => {
       }
 
       if (matchedShop) {
+        // Auto-link owner_id to current authenticated user if not linked yet
+        if (userId && (!matchedShop.owner_id || matchedShop.owner_id !== userId)) {
+          supabase
+            .from('shops')
+            .update({ owner_id: userId })
+            .eq('id', matchedShop.id)
+            .catch?.(() => {});
+        }
+
         setHasStore(true);
         const statusLower = (matchedShop.status || '').toLowerCase();
         const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matchedShop.is_approved === false;
@@ -132,29 +141,18 @@ export const ShopkeeperProvider = ({ children }) => {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
+          const userPhone = user.phone || user.user_metadata?.phone;
+          const userRole = user.user_metadata?.role || 'shopkeeper';
+
           setAuthUser(user);
           setIsLoggedIn(true);
           try { 
             localStorage.setItem('gharsee_shopkeeper_logged_in', 'true'); 
             localStorage.setItem('gharsee_shopkeeper_user', JSON.stringify(user));
           } catch {}
-          await loadUserStoreFromSupabase(user.id, user.phone || user.user_metadata?.phone);
-        } else {
-          // Check if custom mobile phone auth user was stored
-          const savedUserStr = localStorage.getItem('gharsee_shopkeeper_user');
-          if (savedUserStr) {
-            try {
-              const parsedUser = JSON.parse(savedUserStr);
-              if (parsedUser && parsedUser.phone) {
-                setAuthUser(parsedUser);
-                setIsLoggedIn(true);
-                await loadUserStoreFromSupabase(parsedUser.id, parsedUser.phone);
-                return;
-              }
-            } catch {}
-          }
 
-          // No active auth session -> Show Login page
+          await loadUserStoreFromSupabase(user.id, userPhone);
+        } else {
           setAuthUser(null);
           setIsLoggedIn(false);
           setHasStore(false);
@@ -189,6 +187,7 @@ export const ShopkeeperProvider = ({ children }) => {
           setStoreProfile(null);
           try {
             localStorage.removeItem('gharsee_shopkeeper_logged_in');
+            localStorage.removeItem('gharsee_shopkeeper_user');
             localStorage.removeItem('gharsee_has_store');
             localStorage.removeItem('gharsee_store_profile');
           } catch {}

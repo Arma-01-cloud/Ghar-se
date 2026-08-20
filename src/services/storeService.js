@@ -234,7 +234,10 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
     const finalLat = coords.latitude != null ? coords.latitude : (storeCity.toLowerCase().includes('bengaluru') ? 12.9784 : 13.3161);
     const finalLon = coords.longitude != null ? coords.longitude : (storeCity.toLowerCase().includes('bengaluru') ? 77.6408 : 75.7720);
 
+    const ownerId = fallbackUser?.id || storeData.owner_id || null;
+
     const payload = {
+      owner_id: ownerId,
       name: storeData.name,
       phone: storePhone,
       address: storeData.address,
@@ -242,7 +245,6 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
       city: storeCity,
       state: storeState,
       pincode: storePincode,
-      password: storeData.password || null,
       latitude: finalLat,
       longitude: finalLon,
       rating: 5.0,
@@ -261,6 +263,7 @@ export async function createStoreInSupabase(storeData, fallbackUser = null) {
       console.error('SHOP CREATION SUPABASE ERROR:', error.message);
 
       const minimalPayload = {
+        owner_id: ownerId,
         name: storeData.name,
         phone: storePhone,
         address: storeData.address,
@@ -306,12 +309,12 @@ export async function updateStoreInSupabase(storeId, updatedFields) {
     };
     if (updatedFields.name) payload.name = updatedFields.name;
     if (updatedFields.phone) payload.phone = updatedFields.phone;
+    if (updatedFields.owner_id || updatedFields.ownerId) payload.owner_id = updatedFields.owner_id || updatedFields.ownerId;
     if (updatedFields.address) payload.address = updatedFields.address;
     if (updatedFields.locality) payload.locality = updatedFields.locality;
     if (updatedFields.city) payload.city = updatedFields.city;
     if (updatedFields.state) payload.state = updatedFields.state;
     if (updatedFields.pincode) payload.pincode = updatedFields.pincode;
-    if (updatedFields.password) payload.password = updatedFields.password;
     if (updatedFields.latitude != null) payload.latitude = parseFloat(updatedFields.latitude);
     if (updatedFields.longitude != null) payload.longitude = parseFloat(updatedFields.longitude);
     if (updatedFields.image || updatedFields.image_url) payload.image_url = updatedFields.image || updatedFields.image_url;

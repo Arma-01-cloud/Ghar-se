@@ -98,7 +98,7 @@ export async function fetchAllAdminShops() {
 
 // Approve / Accept a Shop Registration
 export async function approveShopInSupabase(shopId) {
-  if (!isSupabaseConfigured) return false;
+  if (!isSupabaseConfigured || !shopId) return false;
 
   try {
     const { error } = await supabase
@@ -106,12 +106,23 @@ export async function approveShopInSupabase(shopId) {
       .update({
         status: 'open',
         is_open: true,
-        is_approved: true,
         updated_at: new Date().toISOString()
       })
       .eq('id', shopId);
 
-    return !error;
+    if (error) {
+      const { error: err2 } = await supabase
+        .from('shops')
+        .update({
+          status: 'open',
+          is_open: true
+        })
+        .eq('id', shopId);
+
+      return !err2;
+    }
+
+    return true;
   } catch (err) {
     return false;
   }
@@ -119,7 +130,7 @@ export async function approveShopInSupabase(shopId) {
 
 // Reject a Shop Registration
 export async function rejectShopInSupabase(shopId) {
-  if (!isSupabaseConfigured) return false;
+  if (!isSupabaseConfigured || !shopId) return false;
 
   try {
     const { error } = await supabase
@@ -127,12 +138,23 @@ export async function rejectShopInSupabase(shopId) {
       .update({
         status: 'rejected',
         is_open: false,
-        is_approved: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', shopId);
 
-    return !error;
+    if (error) {
+      const { error: err2 } = await supabase
+        .from('shops')
+        .update({
+          status: 'rejected',
+          is_open: false
+        })
+        .eq('id', shopId);
+
+      return !err2;
+    }
+
+    return true;
   } catch (err) {
     return false;
   }
@@ -202,20 +224,29 @@ export async function fetchAllAdminRiders() {
 
 // Approve / Verify a Rider Registration
 export async function approveRiderInSupabase(riderId) {
-  if (!isSupabaseConfigured) return false;
+  if (!isSupabaseConfigured || !riderId) return false;
 
   try {
     const { error } = await supabase
       .from('rider_profiles')
       .update({
-        is_approved: true,
         is_online: true,
-        status: 'approved',
         updated_at: new Date().toISOString()
       })
       .eq('id', riderId);
 
-    return !error;
+    if (error) {
+      const { error: err2 } = await supabase
+        .from('rider_profiles')
+        .update({
+          is_online: true
+        })
+        .eq('id', riderId);
+
+      return !err2;
+    }
+
+    return true;
   } catch (err) {
     return false;
   }
@@ -223,20 +254,29 @@ export async function approveRiderInSupabase(riderId) {
 
 // Reject a Rider Registration
 export async function rejectRiderInSupabase(riderId) {
-  if (!isSupabaseConfigured) return false;
+  if (!isSupabaseConfigured || !riderId) return false;
 
   try {
     const { error } = await supabase
       .from('rider_profiles')
       .update({
-        is_approved: false,
         is_online: false,
-        status: 'rejected',
         updated_at: new Date().toISOString()
       })
       .eq('id', riderId);
 
-    return !error;
+    if (error) {
+      const { error: err2 } = await supabase
+        .from('rider_profiles')
+        .update({
+          is_online: false
+        })
+        .eq('id', riderId);
+
+      return !err2;
+    }
+
+    return true;
   } catch (err) {
     return false;
   }

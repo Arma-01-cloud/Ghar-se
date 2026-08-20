@@ -5,7 +5,7 @@ import StoreCard from './StoreCard';
 import { Search, Store, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 export default function StoresPage() {
-  const { currentLocation, availableStores } = useCart();
+  const { currentLocation, availableStores, refreshStores } = useCart();
   const [stores, setStores] = useState(availableStores || []);
   const [isLoading, setIsLoading] = useState(!availableStores || availableStores.length === 0);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -21,6 +21,9 @@ export default function StoresPage() {
     setErrorMsg(null);
 
     try {
+      if (refreshStores) {
+        await refreshStores();
+      }
       const lat = currentLocation?.latitude;
       const lon = currentLocation?.longitude;
       const locName = currentLocation?.name || '';

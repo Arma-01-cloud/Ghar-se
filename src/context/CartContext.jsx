@@ -287,6 +287,13 @@ export const CartProvider = ({ children }) => {
     };
   }, [currentLocation]);
 
+  // Refresh live stores when navigating between relevant customer tabs
+  useEffect(() => {
+    if (activeTab === 'home' || activeTab === 'stores' || activeTab === 'store-detail') {
+      loadNearbyStores();
+    }
+  }, [activeTab]);
+
   // Save location to localStorage and Supabase
   useEffect(() => {
     try {
@@ -771,7 +778,8 @@ export const CartProvider = ({ children }) => {
         placeAnyStoreOrder,
         addToast,
         removeToast,
-        toggleWishlist
+        toggleWishlist,
+        refreshStores: loadNearbyStores
       }}
     >
       {children}

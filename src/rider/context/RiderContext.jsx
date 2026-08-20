@@ -98,9 +98,9 @@ export const RiderProvider = ({ children }) => {
     };
   };
 
-  // Load Rider Profile from Supabase rider_profiles table by 10-digit phone number
-  const loadRiderProfileFromSupabase = async (userPhone) => {
-    if (!isSupabaseConfigured || !userPhone) return;
+  // Load Rider Profile from Supabase rider_profiles table by user_id or 10-digit phone number
+  const loadRiderProfileFromSupabase = async (userId, userPhone) => {
+    if (!isSupabaseConfigured) return;
 
     try {
       const cleanDigits = get10DigitPhone(userPhone);
@@ -108,16 +108,29 @@ export const RiderProvider = ({ children }) => {
 
       let matched = null;
       if (!error && allRiders && allRiders.length > 0) {
-        matched = allRiders.find(r => cleanDigits && get10DigitPhone(r.phone) === cleanDigits);
+        matched = allRiders.find(r => 
+          (userId && r.user_id === userId) || 
+          (cleanDigits && get10DigitPhone(r.phone) === cleanDigits)
+        );
       }
 
       if (matched) {
+        // Auto-link user_id to current authenticated user if not linked yet
+        if (userId && (!matched.user_id || matched.user_id !== userId)) {
+          supabase
+            .from('rider_profiles')
+            .update({ user_id: userId })
+            .eq('id', matched.id)
+            .catch?.(() => {});
+        }
+
         const statusLower = (matched.status || '').toLowerCase();
         const isPending = statusLower === 'pending_approval' || statusLower === 'pending' || matched.is_approved === false;
         const isApproved = !isPending && statusLower !== 'rejected';
 
         const liveProfile = {
           id: matched.id,
+          user_id: matched.user_id || userId,
           fullName: matched.full_name || matched.name || 'Delivery Partner',
           name: matched.full_name || matched.name || 'Delivery Partner',
           phone: matched.phone || userPhone,
@@ -161,22 +174,20 @@ export const RiderProvider = ({ children }) => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          const userPhone = user.phone || user.user_metadata?.phone;
           setAuthUser(user);
           setIsLoggedIn(true);
           try { localStorage.setItem('gharsee_rider_logged_in', 'true'); } catch {}
-          await loadRiderProfileFromSupabase(user.phone || user.user_metadata?.phone);
+          await loadRiderProfileFromSupabase(user.id, userPhone);
         } else {
-          const savedLoggedIn = localStorage.getItem('gharsee_rider_logged_in') === 'true';
-          const savedProfile = localStorage.getItem('gharsee_rider_profile');
-
-          if (savedLoggedIn && savedProfile) {
-            const parsed = JSON.parse(savedProfile);
-            setIsLoggedIn(true);
-            await loadRiderProfileFromSupabase(parsed.phone);
-          } else if (!savedLoggedIn) {
-            setAuthUser(null);
-            setIsLoggedIn(false);
-          }
+          setAuthUser(null);
+          setIsLoggedIn(false);
+          setProfile(INITIAL_RIDER_PROFILE);
+          try {
+            localStorage.removeItem('gharsee_rider_logged_in');
+            localStorage.removeItem('gharsee_rider_profile');
+            localStorage.removeItem('gharsee_rider_earnings');
+          } catch {}
         }
       } catch (err) {
         console.error('Error checking rider auth:', err);
@@ -193,7 +204,7 @@ export const RiderProvider = ({ children }) => {
           setAuthUser(session.user);
           setIsLoggedIn(true);
           try { localStorage.setItem('gharsee_rider_logged_in', 'true'); } catch {}
-          await loadRiderProfileFromSupabase(session.user.phone || session.user.user_metadata?.phone);
+          await loadRiderProfileFromSupabase(session.user.id, session.user.phone || session.user.user_metadata?.phone);
         } else if (event === 'SIGNED_OUT') {
           setAuthUser(null);
           setIsLoggedIn(false);
@@ -559,8 +570,8 @@ export const RiderProvider = ({ children }) => {
 
     const riderPhone = userObj.phone || userObj.user_metadata?.phone;
     if (riderPhone) {
-      await updateRiderOnlineStatusInSupabase(riderPhone, true);
-      await loadRiderProfileFromSupabase(riderPhone);
+      await updateRiderOnlineStatusInSupabase(riderPhone, true, userObj.id);
+      await loadRiderProfileFromSupabase(userObj.id, riderPhone);
     } else {
       const liveProfile = {
         id: userObj.id,
