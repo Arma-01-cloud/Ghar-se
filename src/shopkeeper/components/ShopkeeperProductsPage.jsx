@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useShopkeeper } from '../context/ShopkeeperContext';
-import { fetchProductsByStore, addProductToSupabase, updateProductStockInSupabase } from '../../services/productService';
+import { 
+  fetchProductsByStore, 
+  addProductToSupabase, 
+  updateProductAvailabilityInSupabase 
+} from '../../services/productService';
 import { 
   fetchGlobalCatalog, 
   assignProductToStore, 
@@ -10,17 +14,18 @@ import {
 } from '../../services/globalCatalogService';
 import { 
   Package, Plus, Search, Trash2, X, Loader2, RefreshCw, 
-  Store, CheckCircle2, Edit2, Check, IndianRupee, Tag,
-  AlertCircle, ChevronRight
+  CheckCircle2, Edit2, Check, IndianRupee, Tag,
+  AlertCircle, ChevronDown
 } from 'lucide-react';
 
 export default function ShopkeeperProductsPage() {
-  const { storeProfile, addShopkeeperToast } = useShopkeeper();
+  const { storeProfile, authUser, addShopkeeperToast } = useShopkeeper();
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // "Add from Global Catalog" Modal State
   const [showGlobalCatalogModal, setShowGlobalCatalogModal] = useState(false);
@@ -33,8 +38,6 @@ export default function ShopkeeperProductsPage() {
   const [selectedGlobalProd, setSelectedGlobalProd] = useState(null);
   const [myPrice, setMyPrice] = useState('');
   const [myMrp, setMyMrp] = useState('');
-  const [myStock, setMyStock] = useState('25');
-  const [mySku, setMySku] = useState('');
   const [myAvailable, setMyAvailable] = useState(true);
   const [isAssigning, setIsAssigning] = useState(false);
 
@@ -42,8 +45,6 @@ export default function ShopkeeperProductsPage() {
   const [editingStoreProd, setEditingStoreProd] = useState(null);
   const [editPrice, setEditPrice] = useState('');
   const [editMrp, setEditMrp] = useState('');
-  const [editStock, setEditStock] = useState('');
-  const [editSku, setEditSku] = useState('');
   const [editAvailable, setEditAvailable] = useState(true);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -51,23 +52,41 @@ export default function ShopkeeperProductsPage() {
   const [showCustomAddModal, setShowCustomAddModal] = useState(false);
   const [customProd, setCustomProd] = useState({
     name: '',
-    brand: '',
     category: 'Rice & Grains',
     price: '',
     mrp: '',
     unit: '1 kg',
-    stock: '25',
-    description: ''
+    description: '',
+    isAvailable: true
   });
   const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
 
+  // Helper to resolve active shop ID reliably
+  const getActiveStoreId = () => {
+    if (storeProfile?.id) return storeProfile.id;
+    try {
+      const saved = localStorage.getItem('gharsee_store_profile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.id) return parsed.id;
+      }
+    } catch {}
+    return authUser?.id || null;
+  };
+
   const loadLiveStoreProducts = async () => {
-    if (!storeProfile?.id) return;
+    const storeId = getActiveStoreId();
+    if (!storeId) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const fetched = await fetchProductsByStore(storeProfile.id);
+      const fetched = await fetchProductsByStore(storeId);
       setProducts(fetched || []);
-    } catch {
+    } catch (err) {
+      console.error('Error loading store products:', err);
       setProducts([]);
     } finally {
       setIsLoading(false);
@@ -107,54 +126,88 @@ export default function ShopkeeperProductsPage() {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
       (p.name || '').toLowerCase().includes(q) ||
-      (p.brand || '').toLowerCase().includes(q) ||
-      (p.storeSku || '').toLowerCase().includes(q)
+      (p.category || '').toLowerCase().includes(q)
     );
     if (!matchesSearch) return false;
     if (categoryFilter !== 'all' && (p.category || '').toLowerCase() !== categoryFilter.toLowerCase()) return false;
+    if (statusFilter === 'available' && (p.isAvailable === false || p.is_available === false)) return false;
+    if (statusFilter === 'unavailable' && (p.isAvailable !== false && p.is_available !== false)) return false;
     return true;
   });
 
   // Existing store products global ID set
-  const existingGlobalIds = new Set(products.map(p => p.globalProductId || p.id));
+  const existingGlobalIds = new Set(products.map(p => p.globalProductId || p.id || p.name.toLowerCase()));
 
   // Open Add Flow for a Global Product
   const handleSelectGlobalProduct = (prod) => {
     setSelectedGlobalProd(prod);
-    setMyPrice('');
-    setMyMrp('');
-    setMyStock('25');
-    setMySku('');
+    setMyPrice(prod.price ? String(prod.price) : '');
+    setMyMrp(prod.mrp ? String(prod.mrp) : (prod.price ? String(prod.price) : ''));
     setMyAvailable(true);
   };
 
   // Submit adding from Global Catalog
   const handleAddFromGlobalSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedGlobalProd || !myPrice || !storeProfile?.id) {
-      addShopkeeperToast('Please enter a valid price for this item.', 'error');
+    if (!selectedGlobalProd) return;
+
+    const storeId = getActiveStoreId();
+    if (!storeId) {
+      addShopkeeperToast('Store profile not identified. Please try logging in again.', 'error');
       return;
     }
 
-    setIsAssigning(true);
-    const assigned = await assignProductToStore({
-      storeId: storeProfile.id,
-      globalProductId: selectedGlobalProd.id,
-      price: parseFloat(myPrice),
-      mrp: myMrp ? parseFloat(myMrp) : parseFloat(myPrice),
-      stock: parseInt(myStock || 0, 10),
-      isAvailable: myAvailable,
-      storeSku: mySku.trim()
-    });
-    setIsAssigning(false);
+    const priceNum = myPrice ? parseFloat(myPrice) : (selectedGlobalProd.price || 0);
+    const mrpNum = myMrp ? parseFloat(myMrp) : (selectedGlobalProd.mrp || priceNum);
 
-    if (assigned) {
-      addShopkeeperToast(`✨ Added "${selectedGlobalProd.name}" to your store!`, 'success');
-      setSelectedGlobalProd(null);
-      setShowGlobalCatalogModal(false);
-      await loadLiveStoreProducts();
+    setIsAssigning(true);
+    try {
+      const assigned = await assignProductToStore({
+        storeId: storeId,
+        globalProductId: selectedGlobalProd.id,
+        price: priceNum,
+        mrp: mrpNum,
+        isAvailable: myAvailable
+      });
+
+      if (assigned) {
+        addShopkeeperToast(`✨ Added "${selectedGlobalProd.name}" to your store!`, 'success');
+        setSelectedGlobalProd(null);
+        setShowGlobalCatalogModal(false);
+        await loadLiveStoreProducts();
+      } else {
+        addShopkeeperToast('Failed to add product to store. Please try again.', 'error');
+      }
+    } catch (err) {
+      console.error('Error assigning product:', err);
+      addShopkeeperToast('Error connecting to database.', 'error');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Quick toggle availability directly from table dropdown
+  const handleQuickToggleAvailability = async (prod, nextAvailable) => {
+    const prodId = prod.storeProductId || prod.id;
+    
+    // Optimistic UI update
+    setProducts(prev => prev.map(p => 
+      (p.storeProductId || p.id) === prodId 
+        ? { ...p, isAvailable: nextAvailable, is_available: nextAvailable, status: nextAvailable ? 'Available' : 'Unavailable' }
+        : p
+    ));
+
+    const success = await updateProductAvailabilityInSupabase(prodId, nextAvailable);
+    if (success) {
+      addShopkeeperToast(
+        nextAvailable 
+          ? `🟢 "${prod.name}" marked as AVAILABLE (Customers can now buy)`
+          : `🔴 "${prod.name}" marked as UNAVAILABLE (Hidden from customers)`,
+        nextAvailable ? 'success' : 'info'
+      );
     } else {
-      addShopkeeperToast('Failed to add product to store.', 'error');
+      addShopkeeperToast('Failed to update status in Supabase.', 'error');
+      await loadLiveStoreProducts();
     }
   };
 
@@ -163,33 +216,33 @@ export default function ShopkeeperProductsPage() {
     setEditingStoreProd(prod);
     setEditPrice(String(prod.price || ''));
     setEditMrp(String(prod.mrp || prod.price || ''));
-    setEditStock(String(prod.stock != null ? prod.stock : 25));
-    setEditSku(prod.storeSku || '');
     setEditAvailable(prod.isAvailable !== false && prod.is_available !== false);
   };
 
   // Save edited store product
   const handleSaveEdit = async (e) => {
     e.preventDefault();
-    if (!editingStoreProd || !editPrice) return;
+    if (!editingStoreProd) return;
+
+    const prodId = editingStoreProd.storeProductId || editingStoreProd.id;
+    const priceNum = editPrice ? parseFloat(editPrice) : (editingStoreProd.price || 0);
+    const mrpNum = editMrp ? parseFloat(editMrp) : (editingStoreProd.mrp || priceNum);
 
     setIsSavingEdit(true);
     const success = await updateStoreProductPricing({
-      storeProductId: editingStoreProd.storeProductId || editingStoreProd.id,
-      price: parseFloat(editPrice),
-      mrp: editMrp ? parseFloat(editMrp) : parseFloat(editPrice),
-      stock: parseInt(editStock || 0, 10),
-      isAvailable: editAvailable,
-      storeSku: editSku.trim()
+      storeProductId: prodId,
+      price: priceNum,
+      mrp: mrpNum,
+      isAvailable: editAvailable
     });
     setIsSavingEdit(false);
 
     if (success) {
-      addShopkeeperToast(`✓ Updated pricing & stock for "${editingStoreProd.name}"`, 'success');
+      addShopkeeperToast(`✓ Updated details for "${editingStoreProd.name}"`, 'success');
       setEditingStoreProd(null);
       await loadLiveStoreProducts();
     } else {
-      addShopkeeperToast('Failed to update product.', 'error');
+      addShopkeeperToast('Failed to update product in Supabase.', 'error');
     }
   };
 
@@ -203,7 +256,7 @@ export default function ShopkeeperProductsPage() {
     const success = await removeProductFromStore(prodId);
     if (success) {
       setProducts(prev => prev.filter(p => (p.storeProductId || p.id) !== prodId));
-      addShopkeeperToast(`Removed "${prod.name}" from your inventory`, 'info');
+      addShopkeeperToast(`Removed "${prod.name}" from your store`, 'info');
     } else {
       addShopkeeperToast('Failed to remove product.', 'error');
     }
@@ -212,27 +265,30 @@ export default function ShopkeeperProductsPage() {
   // Submit custom product
   const handleCustomAddSubmit = async (e) => {
     e.preventDefault();
-    if (!customProd.name.trim() || !customProd.price || !storeProfile?.id) return;
+    const storeId = getActiveStoreId();
+    if (!customProd.name.trim() || !storeId) {
+      addShopkeeperToast('Please enter product name.', 'error');
+      return;
+    }
 
     setIsSubmittingCustom(true);
     const inserted = await addProductToSupabase({
       name: customProd.name.trim(),
-      brand: customProd.brand.trim() || 'Store Fresh',
-      category: customProd.category,
-      price: parseFloat(customProd.price) || 100,
-      mrp: customProd.mrp ? parseFloat(customProd.mrp) : parseFloat(customProd.price || 100),
-      unit: customProd.unit,
-      stock: parseInt(customProd.stock || 0, 10),
-      description: customProd.description.trim(),
+      category: customProd.category || 'General Groceries',
+      price: parseFloat(customProd.price) || 0,
+      mrp: customProd.mrp ? parseFloat(customProd.mrp) : parseFloat(customProd.price || 0),
+      unit: customProd.unit || '1 kg',
+      description: customProd.description ? customProd.description.trim() : '',
       image: '/images/cat_veg_fruits.jpg',
-      shop_id: storeProfile.id
+      shop_id: storeId,
+      isAvailable: customProd.isAvailable
     });
     setIsSubmittingCustom(false);
 
     if (inserted) {
-      addShopkeeperToast(`🎉 "${customProd.name}" added to catalog & store inventory!`, 'success');
+      addShopkeeperToast(`🎉 "${customProd.name}" added to your store!`, 'success');
       setShowCustomAddModal(false);
-      setCustomProd({ name: '', brand: '', category: 'Rice & Grains', price: '', mrp: '', unit: '1 kg', stock: '25', description: '' });
+      setCustomProd({ name: '', category: 'Rice & Grains', price: '', mrp: '', unit: '1 kg', description: '', isAvailable: true });
       await loadLiveStoreProducts();
     } else {
       addShopkeeperToast('Failed to add product.', 'error');
@@ -253,7 +309,7 @@ export default function ShopkeeperProductsPage() {
             Store Product Inventory
           </h1>
           <p className="text-stone-500 text-sm mt-1">
-            Pick products from the UR GROZY Global Catalog and set your store's price, stock & availability
+            Pick products from the UR GROZY Global Catalog and manage your store pricing & availability status
           </p>
         </div>
 
@@ -276,13 +332,13 @@ export default function ShopkeeperProductsPage() {
         </div>
       </div>
 
-      {/* SEARCH & CATEGORY BAR */}
+      {/* SEARCH & FILTERS BAR */}
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-2xl border border-stone-200 shadow-2xs">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
           <input
             type="text"
-            placeholder="Search your store products by name, brand, SKU..."
+            placeholder="Search your store products by name or category..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-900 placeholder:text-stone-400 focus:outline-hidden focus:ring-1 focus:ring-emerald-700"
@@ -298,6 +354,16 @@ export default function ShopkeeperProductsPage() {
           {GLOBAL_CATEGORIES.map(cat => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-full sm:w-auto px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-700 focus:outline-hidden"
+        >
+          <option value="all">All Status</option>
+          <option value="available">🟢 Available Only</option>
+          <option value="unavailable">🔴 Unavailable Only</option>
         </select>
 
         <button
@@ -342,87 +408,90 @@ export default function ShopkeeperProductsPage() {
                   <th className="p-4">Category</th>
                   <th className="p-4">My Price (₹)</th>
                   <th className="p-4">MRP (₹)</th>
-                  <th className="p-4">Stock</th>
-                  <th className="p-4">Status</th>
+                  <th className="p-4">Availability Status</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 font-semibold text-stone-800">
-                {filteredProducts.map(prod => (
-                  <tr key={prod.id} className="hover:bg-stone-50/60 transition-colors">
-                    
-                    {/* PRODUCT NAME & BRAND */}
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <img 
-                          src={prod.image || prod.imageUrl || prod.image_url || '/images/cat_veg_fruits.jpg'} 
-                          alt="" 
-                          className="w-11 h-11 object-cover rounded-xl bg-stone-100 border border-stone-200 shrink-0"
-                          onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
-                        />
-                        <div>
-                          <p className="font-extrabold text-stone-900 text-sm">{prod.name}</p>
-                          <span className="text-[10px] text-stone-400">{prod.brand || 'Standard'} • {prod.unit}</span>
-                          {prod.storeSku && (
-                            <span className="text-[9px] font-mono text-stone-400 ml-1.5">[{prod.storeSku}]</span>
-                          )}
+                {filteredProducts.map(prod => {
+                  const isAvailable = prod.isAvailable !== false && prod.is_available !== false;
+
+                  return (
+                    <tr key={prod.id} className="hover:bg-stone-50/60 transition-colors">
+                      
+                      {/* PRODUCT NAME & BRAND */}
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={prod.image || prod.imageUrl || prod.image_url || '/images/cat_veg_fruits.jpg'} 
+                            alt="" 
+                            className="w-11 h-11 object-cover rounded-xl bg-stone-100 border border-stone-200 shrink-0"
+                            onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
+                          />
+                          <div>
+                            <p className="font-extrabold text-stone-900 text-sm">{prod.name}</p>
+                            <span className="text-[10px] text-stone-400">{prod.unit || '1 kg'}</span>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* CATEGORY */}
-                    <td className="p-4 text-stone-600 font-medium">
-                      {prod.category}
-                    </td>
+                      {/* CATEGORY */}
+                      <td className="p-4 text-stone-600 font-medium">
+                        {prod.category}
+                      </td>
 
-                    {/* PRICE */}
-                    <td className="p-4 font-display font-black text-stone-900 text-sm">
-                      ₹{prod.price}
-                    </td>
+                      {/* PRICE */}
+                      <td className="p-4 font-display font-black text-stone-900 text-sm">
+                        ₹{prod.price || 0}
+                      </td>
 
-                    {/* MRP */}
-                    <td className="p-4 text-stone-400">
-                      ₹{prod.mrp || prod.price}
-                    </td>
+                      {/* MRP */}
+                      <td className="p-4 text-stone-400">
+                        ₹{prod.mrp || prod.price || 0}
+                      </td>
 
-                    {/* STOCK */}
-                    <td className="p-4 font-bold text-stone-800">
-                      {prod.stock} {prod.unit}
-                    </td>
+                      {/* AVAILABILITY DROPDOWN (SCROLL DOWN BUTTON) */}
+                      <td className="p-4">
+                        <div className="inline-block relative">
+                          <select
+                            value={isAvailable ? 'available' : 'unavailable'}
+                            onChange={(e) => handleQuickToggleAvailability(prod, e.target.value === 'available')}
+                            className={`pl-3 pr-8 py-1.5 rounded-xl text-xs font-black appearance-none cursor-pointer border shadow-2xs transition-all ${
+                              isAvailable
+                                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100 focus:ring-2 focus:ring-emerald-600/30'
+                                : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100 focus:ring-2 focus:ring-rose-600/30'
+                            }`}
+                          >
+                            <option value="available">🟢 Available</option>
+                            <option value="unavailable">🔴 Unavailable</option>
+                          </select>
+                          <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                        </div>
+                      </td>
 
-                    {/* AVAILABILITY */}
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                        prod.isAvailable && prod.stock > 0
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}>
-                        {prod.isAvailable && prod.stock > 0 ? 'Available' : 'Out of Stock'}
-                      </span>
-                    </td>
+                      {/* ACTIONS */}
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleStartEdit(prod)}
+                            className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors cursor-pointer"
+                            title="Edit Price & Status"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(prod)}
+                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl transition-colors cursor-pointer"
+                            title="Remove from Store"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
 
-                    {/* ACTIONS */}
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleStartEdit(prod)}
-                          className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors cursor-pointer"
-                          title="Edit Price & Stock"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProduct(prod)}
-                          className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl transition-colors cursor-pointer"
-                          title="Remove from Store"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -444,7 +513,7 @@ export default function ShopkeeperProductsPage() {
                     Add from UR GROZY Global Catalog
                   </h3>
                   <p className="text-xs text-stone-400">
-                    Search central catalog and set your store selling price & initial stock
+                    Search central marketplace products and set your store selling price & status
                   </p>
                 </div>
               </div>
@@ -463,7 +532,7 @@ export default function ShopkeeperProductsPage() {
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="text"
-                  placeholder="Search global products by name, brand, keywords..."
+                  placeholder="Search global products by name, category..."
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
@@ -497,15 +566,15 @@ export default function ShopkeeperProductsPage() {
                       setShowGlobalCatalogModal(false);
                       setShowCustomAddModal(true);
                     }}
-                    className="text-emerald-800 font-extrabold hover:underline"
+                    className="text-emerald-800 font-extrabold hover:underline cursor-pointer"
                   >
-                    + Add Custom Item to Platform
+                    + Add Custom Item to Store
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {globalProducts.map(gp => {
-                    const isAlreadyInStore = existingGlobalIds.has(gp.id);
+                    const isAlreadyInStore = products.some(p => (p.name || '').toLowerCase() === (gp.name || '').toLowerCase());
 
                     return (
                       <div 
@@ -518,13 +587,14 @@ export default function ShopkeeperProductsPage() {
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <img 
-                            src={gp.imageUrl || gp.image_url} 
+                            src={gp.imageUrl || gp.image_url || '/images/cat_veg_fruits.jpg'} 
                             alt="" 
                             className="w-12 h-12 rounded-xl object-cover bg-stone-100 border border-stone-200 shrink-0" 
+                            onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
                           />
                           <div className="min-w-0">
                             <h5 className="font-extrabold text-stone-900 text-xs truncate">{gp.name}</h5>
-                            <p className="text-[10px] text-stone-500">{gp.brand} • {gp.unit}</p>
+                            <p className="text-[10px] text-stone-500">{gp.unit || '1 kg'}</p>
                             <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 rounded font-bold">
                               {gp.category}
                             </span>
@@ -568,23 +638,24 @@ export default function ShopkeeperProductsPage() {
         </div>
       )}
 
-      {/* 2. SET STORE PRICING DIALOG OVERLAY */}
+      {/* 2. SET STORE PRICING & STATUS DIALOG OVERLAY */}
       {selectedGlobalProd && (
         <div className="fixed inset-0 z-60 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-stone-200 space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-3">
                 <img 
-                  src={selectedGlobalProd.imageUrl || selectedGlobalProd.image_url} 
+                  src={selectedGlobalProd.imageUrl || selectedGlobalProd.image_url || '/images/cat_veg_fruits.jpg'} 
                   alt="" 
                   className="w-10 h-10 rounded-xl object-cover bg-stone-100 shrink-0" 
+                  onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
                 />
                 <div>
                   <h4 className="font-display font-extrabold text-sm text-stone-900">{selectedGlobalProd.name}</h4>
-                  <p className="text-[11px] text-stone-500">{selectedGlobalProd.brand} • {selectedGlobalProd.unit}</p>
+                  <p className="text-[11px] text-stone-500">{selectedGlobalProd.category} • {selectedGlobalProd.unit}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedGlobalProd(null)} className="text-stone-400 hover:text-stone-600">
+              <button onClick={() => setSelectedGlobalProd(null)} className="text-stone-400 hover:text-stone-600 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -608,72 +679,50 @@ export default function ShopkeeperProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
-                    MRP (₹) (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="e.g. 160"
-                    value={myMrp}
-                    onChange={(e) => setMyMrp(e.target.value)}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
-                    Initial Stock Units
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="25"
-                    value={myStock}
-                    onChange={(e) => setMyStock(e.target.value)}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
-                  Store SKU / Shelf Code (Optional)
+                  MRP (₹) (Optional)
                 </label>
                 <input
-                  type="text"
-                  placeholder="e.g. SHELF-A3"
-                  value={mySku}
-                  onChange={(e) => setMySku(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-mono text-stone-900 focus:outline-hidden"
+                  type="number"
+                  step="0.5"
+                  placeholder="e.g. 160"
+                  value={myMrp}
+                  onChange={(e) => setMyMrp(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                 />
               </div>
 
-              <div className="pt-2">
-                <label className="flex items-center gap-2 text-xs font-bold text-stone-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={myAvailable}
-                    onChange={(e) => setMyAvailable(e.target.checked)}
-                    className="rounded text-emerald-700"
-                  />
-                  <span>Mark as In Stock & Available for Delivery</span>
+              {/* AVAILABILITY DROPDOWN (SCROLL DOWN BUTTON) */}
+              <div>
+                <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                  Product Status *
                 </label>
+                <div className="relative">
+                  <select
+                    value={myAvailable ? 'available' : 'unavailable'}
+                    onChange={(e) => setMyAvailable(e.target.value === 'available')}
+                    className="w-full px-3 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 appearance-none focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 cursor-pointer"
+                  >
+                    <option value="available">🟢 Available (In Stock & Orderable)</option>
+                    <option value="unavailable">🔴 Unavailable (Out of Stock)</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setSelectedGlobalProd(null)}
-                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs"
+                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isAssigning}
-                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs cursor-pointer"
                 >
                   {isAssigning ? 'Adding...' : 'Add to My Store'}
                 </button>
@@ -689,10 +738,10 @@ export default function ShopkeeperProductsPage() {
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-stone-200 space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
-                <h4 className="font-display font-extrabold text-base text-stone-900">Edit Price & Stock</h4>
+                <h4 className="font-display font-extrabold text-base text-stone-900">Edit Price & Status</h4>
                 <p className="text-xs text-stone-500">{editingStoreProd.name}</p>
               </div>
-              <button onClick={() => setEditingStoreProd(null)} className="text-stone-400 hover:text-stone-600">
+              <button onClick={() => setEditingStoreProd(null)} className="text-stone-400 hover:text-stone-600 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -715,69 +764,49 @@ export default function ShopkeeperProductsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
-                    MRP (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={editMrp}
-                    onChange={(e) => setEditMrp(e.target.value)}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
-                    Stock ({editingStoreProd.unit})
-                  </label>
-                  <input
-                    type="number"
-                    value={editStock}
-                    onChange={(e) => setEditStock(e.target.value)}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
-                  Store SKU
+                  MRP (₹)
                 </label>
                 <input
-                  type="text"
-                  value={editSku}
-                  onChange={(e) => setEditSku(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-mono text-stone-900 focus:outline-hidden"
+                  type="number"
+                  step="0.5"
+                  value={editMrp}
+                  onChange={(e) => setEditMrp(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                 />
               </div>
 
-              <div className="pt-2">
-                <label className="flex items-center gap-2 text-xs font-bold text-stone-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editAvailable}
-                    onChange={(e) => setEditAvailable(e.target.checked)}
-                    className="rounded text-emerald-700"
-                  />
-                  <span>Available in Store</span>
+              {/* AVAILABILITY DROPDOWN (SCROLL DOWN BUTTON) */}
+              <div>
+                <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                  Product Status *
                 </label>
+                <div className="relative">
+                  <select
+                    value={editAvailable ? 'available' : 'unavailable'}
+                    onChange={(e) => setEditAvailable(e.target.value === 'available')}
+                    className="w-full px-3 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 appearance-none focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="available">🟢 Available (In Stock)</option>
+                    <option value="unavailable">🔴 Unavailable (Out of Stock)</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setEditingStoreProd(null)}
-                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs"
+                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingEdit}
-                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs cursor-pointer"
                 >
                   {isSavingEdit ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -793,7 +822,7 @@ export default function ShopkeeperProductsPage() {
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-stone-200 space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <h4 className="font-display font-extrabold text-base text-stone-900">Add Custom Product</h4>
-              <button onClick={() => setShowCustomAddModal(false)} className="text-stone-400 hover:text-stone-600">
+              <button onClick={() => setShowCustomAddModal(false)} className="text-stone-400 hover:text-stone-600 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -872,18 +901,35 @@ export default function ShopkeeperProductsPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                  Product Status *
+                </label>
+                <div className="relative">
+                  <select
+                    value={customProd.isAvailable ? 'available' : 'unavailable'}
+                    onChange={(e) => setCustomProd({ ...customProd, isAvailable: e.target.value === 'available' })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 appearance-none focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="available">🟢 Available (In Stock)</option>
+                    <option value="unavailable">🔴 Unavailable (Out of Stock)</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-stone-400" />
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setShowCustomAddModal(false)}
-                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs"
+                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingCustom}
-                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs cursor-pointer"
                 >
                   {isSubmittingCustom ? 'Adding...' : 'Add Custom Item'}
                 </button>

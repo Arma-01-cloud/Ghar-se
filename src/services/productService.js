@@ -133,34 +133,52 @@ export async function addProductToSupabase(productData) {
   }
 }
 
-// Update product stock in both store_products and products tables
+// Update product availability (Available / Unavailable) in Supabase
+export async function updateProductAvailabilityInSupabase(productId, isAvailable) {
+  if (!isSupabaseConfigured || !productId) return true;
+  const boolVal = Boolean(isAvailable);
+
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ 
+        is_available: boolVal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId);
+
+    if (error) {
+      console.warn('Could not update availability in Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Exception in updateProductAvailabilityInSupabase:', err);
+    return false;
+  }
+}
+
+// Update product stock in legacy/fallback table
 export async function updateProductStockInSupabase(productId, newStock) {
   if (!isSupabaseConfigured || !productId) return true;
   const parsedStock = parseInt(newStock, 10) || 0;
 
   try {
-    // 1. Attempt update in store_products
-    const { error: spErr } = await supabase
-      .from('store_products')
+    const { error: prodErr } = await supabase
+      .from('products')
       .update({ 
         stock: parsedStock,
         updated_at: new Date().toISOString()
       })
       .eq('id', productId);
 
-    if (!spErr) return true;
-
-    // 2. Fallback: update in legacy products table
-    const { error: prodErr } = await supabase
-      .from('products')
-      .update({ stock: parsedStock })
-      .eq('id', productId);
-
     if (prodErr) {
       console.warn('Could not update stock in Supabase:', prodErr.message);
+      return false;
     }
+    return true;
   } catch (err) {
-    console.error('Exception updating product stock:', err);
+    console.error('Exception in updateProductStockInSupabase:', err);
+    return false;
   }
-  return true;
 }

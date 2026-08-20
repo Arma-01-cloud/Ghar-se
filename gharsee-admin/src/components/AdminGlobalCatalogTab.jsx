@@ -14,7 +14,7 @@ import AdminGlobalProductStoresModal from './AdminGlobalProductStoresModal';
 import { 
   Package, Plus, Search, Edit2, Trash2, CheckCircle2, 
   RefreshCw, Upload, Check, Store, ChevronLeft, ChevronRight,
-  ArrowUpDown, X, Barcode, ShieldAlert
+  ArrowUpDown, X, Barcode, ShieldAlert, IndianRupee
 } from 'lucide-react';
 
 const PRESET_IMAGES = [
@@ -46,12 +46,10 @@ export default function AdminGlobalCatalogTab() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedStoreUsage, setSelectedStoreUsage] = useState('all');
   const [sortField, setSortField] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [brandsList, setBrandsList] = useState([]);
 
   const [selectedProductForStores, setSelectedProductForStores] = useState(null);
 
@@ -63,14 +61,12 @@ export default function AdminGlobalCatalogTab() {
 
   const [formData, setFormData] = useState({
     name: '',
-    brand: 'Standard',
     category: 'Rice & Grains',
-    subcategory: '',
     unit: '1 kg',
-    quantity: '1',
+    price: '',
+    mrp: '',
     barcode: '',
-    searchKeywords: '',
-    imageUrl: '/images/cat_veg_fruits.jpg',
+    imageUrl: '/images/cat_rice_grains.jpg',
     description: '',
     isActive: true
   });
@@ -87,7 +83,6 @@ export default function AdminGlobalCatalogTab() {
           limit,
           search: searchQuery,
           category: selectedCategory,
-          brand: selectedBrand,
           isActive: selectedStatus,
           storeUsage: selectedStoreUsage,
           sortField,
@@ -99,16 +94,14 @@ export default function AdminGlobalCatalogTab() {
       setProducts(catalogRes.products || []);
       setTotalCount(catalogRes.totalCount || 0);
       setTotalPages(catalogRes.totalPages || 1);
-      if (catalogRes.brands && catalogRes.brands.length > 0) {
-        setBrandsList(catalogRes.brands);
-      }
       setStats(statsRes);
     } catch (err) {
+      console.error('Error in loadData:', err);
       addAdminToast('Error fetching global catalog records.', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, searchQuery, selectedCategory, selectedBrand, selectedStatus, selectedStoreUsage, sortField, sortOrder, addAdminToast]);
+  }, [page, limit, searchQuery, selectedCategory, selectedStatus, selectedStoreUsage, sortField, sortOrder, addAdminToast]);
 
   useEffect(() => {
     loadData();
@@ -130,9 +123,7 @@ export default function AdminGlobalCatalogTab() {
     duplicateCheckTimer.current = setTimeout(async () => {
       const res = await checkDuplicateGlobalProduct({
         name: formData.name,
-        brand: formData.brand,
         unit: formData.unit,
-        quantity: formData.quantity,
         barcode: formData.barcode,
         excludeId: editingProduct?.id || null
       });
@@ -147,20 +138,18 @@ export default function AdminGlobalCatalogTab() {
     return () => {
       if (duplicateCheckTimer.current) clearTimeout(duplicateCheckTimer.current);
     };
-  }, [formData.name, formData.brand, formData.unit, formData.barcode, isFormOpen, editingProduct]);
+  }, [formData.name, formData.unit, formData.barcode, isFormOpen, editingProduct]);
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setDuplicateWarning(null);
     setFormData({
       name: '',
-      brand: 'Standard',
       category: 'Rice & Grains',
-      subcategory: '',
       unit: '1 kg',
-      quantity: '1',
+      price: '',
+      mrp: '',
       barcode: '',
-      searchKeywords: '',
       imageUrl: '/images/cat_rice_grains.jpg',
       description: '',
       isActive: true
@@ -173,13 +162,11 @@ export default function AdminGlobalCatalogTab() {
     setDuplicateWarning(null);
     setFormData({
       name: prod.name,
-      brand: prod.brand || 'Standard',
       category: prod.category || 'Rice & Grains',
-      subcategory: prod.subcategory || '',
       unit: prod.unit || '1 kg',
-      quantity: String(prod.quantity || 1),
+      price: prod.price ? String(prod.price) : '',
+      mrp: prod.mrp ? String(prod.mrp) : '',
       barcode: prod.barcode || '',
-      searchKeywords: prod.searchKeywords || '',
       imageUrl: prod.imageUrl || prod.image_url || '/images/cat_veg_fruits.jpg',
       description: prod.description || '',
       isActive: prod.isActive !== false && prod.is_active !== false
@@ -197,7 +184,7 @@ export default function AdminGlobalCatalogTab() {
       setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
       addAdminToast('Image compressed and attached! ✓', 'success');
     } catch (err) {
-      addAdminToast(err.message || 'Image upload failed', 'error');
+      addAdminToast(err.message || 'Image processing failed', 'error');
     } finally {
       setIsUploadingImage(false);
     }
@@ -205,25 +192,27 @@ export default function AdminGlobalCatalogTab() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim()) {
+      addAdminToast('Please enter a product name.', 'error');
+      return;
+    }
 
     setIsSubmitting(true);
 
-    if (editingProduct) {
-      const success = await updateGlobalProduct(editingProduct.id, {
-        name: formData.name.trim(),
-        brand: formData.brand.trim() || 'Standard',
-        category: formData.category,
-        subcategory: formData.subcategory.trim(),
-        unit: formData.unit.trim(),
-        quantity: parseFloat(formData.quantity) || 1,
-        barcode: formData.barcode.trim(),
-        searchKeywords: formData.searchKeywords.trim(),
-        imageUrl: formData.imageUrl,
-        description: formData.description.trim(),
-        isActive: formData.isActive
-      });
+    const payload = {
+      name: formData.name.trim(),
+      category: formData.category || 'General Groceries',
+      price: formData.price ? parseFloat(formData.price) : 0,
+      mrp: formData.mrp ? parseFloat(formData.mrp) : (formData.price ? parseFloat(formData.price) : 0),
+      unit: formData.unit.trim() || '1 kg',
+      barcode: formData.barcode ? formData.barcode.trim() : '',
+      imageUrl: formData.imageUrl,
+      description: formData.description ? formData.description.trim() : '',
+      isActive: formData.isActive
+    };
 
+    if (editingProduct) {
+      const success = await updateGlobalProduct(editingProduct.id, payload);
       setIsSubmitting(false);
 
       if (success) {
@@ -231,31 +220,18 @@ export default function AdminGlobalCatalogTab() {
         setIsFormOpen(false);
         await loadData();
       } else {
-        addAdminToast('Failed to update product.', 'error');
+        addAdminToast('Failed to update product in Supabase.', 'error');
       }
     } else {
-      const created = await createGlobalProduct({
-        name: formData.name.trim(),
-        brand: formData.brand.trim() || 'Standard',
-        category: formData.category,
-        subcategory: formData.subcategory.trim(),
-        unit: formData.unit.trim(),
-        quantity: parseFloat(formData.quantity) || 1,
-        barcode: formData.barcode.trim(),
-        searchKeywords: formData.searchKeywords.trim(),
-        imageUrl: formData.imageUrl,
-        description: formData.description.trim(),
-        isActive: formData.isActive
-      });
-
+      const created = await createGlobalProduct(payload);
       setIsSubmitting(false);
 
       if (created) {
-        addAdminToast(`🎉 Added "${formData.name}" to Global Catalog!`, 'success');
+        addAdminToast(`🎉 Product "${formData.name}" saved in Supabase Global Catalog!`, 'success');
         setIsFormOpen(false);
         await loadData();
       } else {
-        addAdminToast('Failed to create global product.', 'error');
+        addAdminToast('Failed to save product in Supabase. Please try again.', 'error');
       }
     }
   };
@@ -301,7 +277,7 @@ export default function AdminGlobalCatalogTab() {
               Global Product Catalog
             </h1>
             <p className="text-stone-500 text-xs sm:text-sm mt-1">
-              One central product identity assigned to multiple grocery stores with isolated store pricing & inventory
+              Common catalog for all UR GROZY darkstores & partner shops. Saved directly in Supabase.
             </p>
           </div>
 
@@ -340,12 +316,12 @@ export default function AdminGlobalCatalogTab() {
 
       {/* SEARCH & FILTERS TOOLBAR */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative sm:col-span-2 lg:col-span-2">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
-              placeholder="Search by name, brand, barcode, keywords..."
+              placeholder="Search by name, category, description..."
               value={searchQuery}
               onChange={handleSearchChange}
               className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs font-semibold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700"
@@ -375,19 +351,6 @@ export default function AdminGlobalCatalogTab() {
 
           <div>
             <select
-              value={selectedBrand}
-              onChange={(e) => { setSelectedBrand(e.target.value); setPage(1); }}
-              className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs font-bold text-stone-700 focus:outline-hidden"
-            >
-              <option value="all">All Brands</option>
-              {brandsList.map(b => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <select
               value={selectedStatus}
               onChange={(e) => { setSelectedStatus(e.target.value); setPage(1); }}
               className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs font-bold text-stone-700 focus:outline-hidden"
@@ -395,18 +358,6 @@ export default function AdminGlobalCatalogTab() {
               <option value="all">Status: All</option>
               <option value="active">Active Only</option>
               <option value="inactive">Inactive Only</option>
-            </select>
-          </div>
-
-          <div>
-            <select
-              value={selectedStoreUsage}
-              onChange={(e) => { setSelectedStoreUsage(e.target.value); setPage(1); }}
-              className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs font-bold text-stone-700 focus:outline-hidden"
-            >
-              <option value="all">Stores: All</option>
-              <option value="assigned">In Stores</option>
-              <option value="unassigned">Unassigned</option>
             </select>
           </div>
         </div>
@@ -422,7 +373,7 @@ export default function AdminGlobalCatalogTab() {
               <option value="created_at">Recently Created</option>
               <option value="name">Product Name (A-Z)</option>
               <option value="category">Category</option>
-              <option value="brand">Brand</option>
+              <option value="price">Price</option>
             </select>
 
             <button
@@ -465,7 +416,7 @@ export default function AdminGlobalCatalogTab() {
         {isLoading ? (
           <div className="py-20 text-center space-y-3">
             <RefreshCw className="w-8 h-8 text-emerald-700 animate-spin mx-auto" />
-            <p className="text-xs font-bold text-stone-500">Loading Global Catalog Records...</p>
+            <p className="text-xs font-bold text-stone-500">Loading Global Catalog Records from Supabase...</p>
           </div>
         ) : products.length === 0 ? (
           <div className="py-20 text-center space-y-3">
@@ -473,7 +424,7 @@ export default function AdminGlobalCatalogTab() {
             <h3 className="font-display font-extrabold text-base text-stone-800">No Global Products Found</h3>
             <button
               onClick={handleOpenAdd}
-              className="px-4 py-2 bg-emerald-800 text-white rounded-xl font-bold text-xs shadow-xs"
+              className="px-4 py-2 bg-emerald-800 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer"
             >
               Add First Global Product
             </button>
@@ -484,9 +435,9 @@ export default function AdminGlobalCatalogTab() {
               <thead className="bg-stone-50 border-b border-stone-200 uppercase text-stone-400 font-black text-[10px] tracking-wider">
                 <tr>
                   <th className="p-4">Product Identity</th>
-                  <th className="p-4">Category & Subcategory</th>
+                  <th className="p-4">Category</th>
                   <th className="p-4">Unit / Size</th>
-                  <th className="p-4">Barcode</th>
+                  <th className="p-4">Ref. Price</th>
                   <th className="p-4">Stores Carrying</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Actions</th>
@@ -508,18 +459,17 @@ export default function AdminGlobalCatalogTab() {
                           <h4 className="font-display font-black text-stone-900 text-sm truncate max-w-xs">
                             {prod.name}
                           </h4>
-                          <span className="text-[10px] px-2 py-0.2 rounded-md bg-stone-100 text-stone-600 font-bold border border-stone-200">
-                            {prod.brand || 'Standard'}
-                          </span>
+                          {prod.description && (
+                            <span className="text-[10px] text-stone-400 line-clamp-1">
+                              {prod.description}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
 
                     <td className="p-4">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-stone-900 block">{prod.category}</span>
-                        {prod.subcategory && <span className="text-[10px] text-stone-400">{prod.subcategory}</span>}
-                      </div>
+                      <span className="text-xs font-bold text-stone-900">{prod.category}</span>
                     </td>
 
                     <td className="p-4 font-bold text-stone-800">
@@ -528,15 +478,8 @@ export default function AdminGlobalCatalogTab() {
                       </span>
                     </td>
 
-                    <td className="p-4 font-mono text-stone-500 text-[11px]">
-                      {prod.barcode ? (
-                        <div className="flex items-center gap-1">
-                          <Barcode className="w-3.5 h-3.5 text-stone-400" />
-                          <span>{prod.barcode}</span>
-                        </div>
-                      ) : (
-                        <span className="text-stone-300">—</span>
-                      )}
+                    <td className="p-4 font-black text-stone-900">
+                      ₹{prod.price || 0}
                     </td>
 
                     <td className="p-4">
@@ -648,17 +591,17 @@ export default function AdminGlobalCatalogTab() {
                     {editingProduct ? 'Edit Global Product' : 'Add New Global Product'}
                   </h3>
                   <p className="text-[11px] text-stone-400">
-                    Defines the central identity shared across all store inventories
+                    Saved directly to Supabase Global Catalog
                   </p>
                 </div>
               </div>
 
-              <button onClick={() => setIsFormOpen(false)} className="text-stone-400 hover:text-white">
+              <button onClick={() => setIsFormOpen(false)} className="text-stone-400 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} id="global-product-form" className="p-6 space-y-5 overflow-y-auto flex-1 bg-[#FBF9F5]">
+            <form onSubmit={handleSubmit} id="global-product-form" className="p-6 space-y-4 overflow-y-auto flex-1 bg-[#FBF9F5]">
               {duplicateWarning && (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 space-y-2 shadow-xs">
                   <div className="flex items-start gap-2.5 text-amber-900">
@@ -685,16 +628,6 @@ export default function AdminGlobalCatalogTab() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Brand *</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    required
-                    className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
-                  />
-                </div>
-                <div className="space-y-1">
                   <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Category *</label>
                   <select
                     value={formData.category}
@@ -707,24 +640,11 @@ export default function AdminGlobalCatalogTab() {
                     ))}
                   </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Subcategory</label>
-                  <input
-                    type="text"
-                    placeholder="Basmati Rice"
-                    value={formData.subcategory}
-                    onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
-                  />
-                </div>
                 <div className="space-y-1">
                   <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Unit / Size *</label>
                   <input
                     type="text"
-                    placeholder="1 kg, 5 kg, 500 ml"
+                    placeholder="e.g. 1 kg, 500 g, 1 L"
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                     required
@@ -735,31 +655,55 @@ export default function AdminGlobalCatalogTab() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Barcode</label>
-                  <input
-                    type="text"
-                    placeholder="8901030384920"
-                    value={formData.barcode}
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-mono text-stone-900 focus:outline-hidden"
-                  />
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Reference Selling Price (₹) (Optional)</label>
+                  <div className="relative">
+                    <IndianRupee className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="e.g. 150"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      className="w-full pl-8 pr-3 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Search Keywords</label>
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">MRP (₹) (Optional)</label>
                   <input
-                    type="text"
-                    placeholder="chawal, rice, atta"
-                    value={formData.searchKeywords}
-                    onChange={(e) => setFormData({ ...formData, searchKeywords: e.target.value })}
+                    type="number"
+                    step="0.5"
+                    placeholder="e.g. 170"
+                    value={formData.mrp}
+                    onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Description</label>
+                <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+                  Barcode (Optional)
+                </label>
+                <div className="relative">
+                  <Barcode className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. 8901030384920"
+                    value={formData.barcode}
+                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                    className="w-full pl-8 pr-3 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-mono text-stone-900 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+                  Product Description (Optional)
+                </label>
                 <textarea
                   rows={2}
+                  placeholder="Optional product details..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3.5 py-2 bg-white border border-stone-300 rounded-xl text-xs font-semibold text-stone-900 focus:outline-hidden"
@@ -827,7 +771,7 @@ export default function AdminGlobalCatalogTab() {
                 className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>{isSubmitting ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}</span>
+                <span>{isSubmitting ? 'Saving...' : editingProduct ? 'Update Product' : 'Save to Supabase'}</span>
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCart } from '../context/CartContext';
-import { Star, Plus, Minus, ShoppingBag, Heart, Eye, ChevronDown } from 'lucide-react';
+import { Star, Plus, Minus, ShoppingBag, Heart, Eye, AlertCircle } from 'lucide-react';
 import { getUnitVariants, getProductWithVariant } from '../utils/unitVariants';
 
 export default function ProductCard({ product, onQuickView }) {
@@ -18,6 +18,12 @@ export default function ProductCard({ product, onQuickView }) {
     return getProductWithVariant(product, selectedVariant || defaultVariant);
   }, [product, selectedVariant, defaultVariant]);
 
+  // Determine availability status
+  const isAvailable = activeProduct.isAvailable !== false && 
+                      activeProduct.is_available !== false && 
+                      activeProduct.status !== 'Unavailable' && 
+                      activeProduct.status !== 'Out of Stock';
+
   // Check if this specific variant is already in cart
   const cartItem = cart.find(item => item.product.id === activeProduct.id);
   const inCartQty = cartItem ? cartItem.quantity : 0;
@@ -25,11 +31,13 @@ export default function ProductCard({ product, onQuickView }) {
 
   const handleAdd = (e) => {
     e.stopPropagation();
+    if (!isAvailable) return;
     addToCart(activeProduct, qty);
   };
 
   const handleInc = (e) => {
     e.stopPropagation();
+    if (!isAvailable) return;
     updateQuantity(activeProduct.id, inCartQty + 1);
   };
 
@@ -50,14 +58,22 @@ export default function ProductCard({ product, onQuickView }) {
   return (
     <div 
       onClick={() => onQuickView && onQuickView(activeProduct)}
-      className="group relative bg-white rounded-2xl border border-stone-200/80 p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-xl hover:border-emerald-300 transition-all duration-300 cursor-pointer overflow-hidden"
+      className={`group relative bg-white rounded-2xl border p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-300 cursor-pointer overflow-hidden ${
+        isAvailable 
+          ? 'border-stone-200/80 hover:shadow-xl hover:border-emerald-300' 
+          : 'border-stone-200 bg-stone-50/50 opacity-90'
+      }`}
     >
       
       {/* DISCOUNT BADGE & WISHLIST BUTTON */}
       <div className="flex items-center justify-between z-10">
-        {discountPercent > 0 ? (
+        {discountPercent > 0 && isAvailable ? (
           <span className="bg-emerald-700 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg shadow-xs">
             {discountPercent}% OFF
+          </span>
+        ) : !isAvailable ? (
+          <span className="bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center gap-1">
+            <span>Unavailable</span>
           </span>
         ) : (
           <span className="bg-stone-100 text-stone-600 text-[10px] font-bold px-2 py-0.5 rounded-lg">
@@ -83,16 +99,29 @@ export default function ProductCard({ product, onQuickView }) {
         <img
           src={activeProduct.image || activeProduct.imageUrl || activeProduct.image_url || '/images/cat_veg_fruits.jpg'}
           alt={activeProduct.name}
-          className="w-full h-full object-cover transform group-hover:scale-108 transition-transform duration-500"
+          className={`w-full h-full object-cover transform group-hover:scale-108 transition-transform duration-500 ${
+            !isAvailable ? 'opacity-60 grayscale-[40%]' : ''
+          }`}
           onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
         />
 
+        {/* Unavailable Overlay */}
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center">
+            <span className="bg-white/95 text-rose-800 text-[11px] font-black px-3 py-1 rounded-full shadow-md uppercase tracking-wider">
+              Out of Stock
+            </span>
+          </div>
+        )}
+
         {/* Quick View Hover Overlay */}
-        <div className="absolute inset-0 bg-emerald-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <span className="bg-white/90 backdrop-blur-xs text-emerald-900 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
-            <Eye className="w-3.5 h-3.5" /> Quick View
-          </span>
-        </div>
+        {isAvailable && (
+          <div className="absolute inset-0 bg-emerald-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <span className="bg-white/90 backdrop-blur-xs text-emerald-900 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
+              <Eye className="w-3.5 h-3.5" /> Quick View
+            </span>
+          </div>
+        )}
       </div>
 
       {/* PRODUCT DETAILS */}
@@ -120,7 +149,7 @@ export default function ProductCard({ product, onQuickView }) {
           <span className="text-[11px] text-stone-400 font-medium">({activeProduct.reviews || 38})</span>
         </div>
 
-        {/* UNIT / WEIGHT SELECTOR CHIPS (GRAMS, KG, ML, LITER) */}
+        {/* UNIT / WEIGHT SELECTOR CHIPS */}
         {variants.length > 1 && (
           <div className="pt-1" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
@@ -163,7 +192,15 @@ export default function ProductCard({ product, onQuickView }) {
 
       {/* QUANTITY SELECTOR & ADD TO CART BUTTON */}
       <div className="pt-2.5 border-t border-stone-100 mt-2">
-        {inCartQty > 0 ? (
+        {!isAvailable ? (
+          <button
+            disabled
+            onClick={(e) => e.stopPropagation()}
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-stone-100 text-stone-400 border border-stone-200 text-xs sm:text-sm font-extrabold rounded-xl cursor-not-allowed uppercase tracking-wider"
+          >
+            <span>Unavailable</span>
+          </button>
+        ) : inCartQty > 0 ? (
           <div className="flex items-center justify-between bg-emerald-800 text-white rounded-xl p-1 shadow-md">
             <button
               onClick={handleDec}
@@ -181,7 +218,6 @@ export default function ProductCard({ product, onQuickView }) {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            {/* Local Qty Selector before adding */}
             <div className="hidden xs:flex items-center border border-stone-200 rounded-xl bg-stone-50 p-0.5 text-stone-700 text-xs">
               <button
                 type="button"
@@ -206,7 +242,6 @@ export default function ProductCard({ product, onQuickView }) {
               </button>
             </div>
 
-            {/* Add Button */}
             <button
               onClick={handleAdd}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs sm:text-sm font-extrabold rounded-xl transition-all shadow-sm hover:shadow-emerald-900/20 cursor-pointer"

@@ -109,6 +109,25 @@ export async function addProductToSupabase(productData) {
   return { id: `prod-${Date.now()}`, ...productData };
 }
 
+export async function updateProductAvailabilityInSupabase(productId, isAvailable) {
+  if (!productId) return true;
+  const boolVal = Boolean(isAvailable);
+
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ 
+        is_available: boolVal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId);
+
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function updateProductStockInSupabase(productId, newStock) {
   if (!productId) return true;
 
