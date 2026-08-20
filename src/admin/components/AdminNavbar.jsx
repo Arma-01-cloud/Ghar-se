@@ -2,7 +2,7 @@ import React from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { 
   Shield, Store, Bike, Users, ShoppingBag, 
-  BarChart3, RefreshCw, LogOut, ShieldCheck, Sparkles
+  BarChart3, RefreshCw, LogOut, Package
 } from 'lucide-react';
 
 export default function AdminNavbar() {
@@ -30,6 +30,13 @@ export default function AdminNavbar() {
       badgeColor: 'bg-amber-500 text-stone-950 font-black'
     },
     {
+      id: 'global-catalog',
+      label: 'Global Catalog',
+      icon: Package,
+      badge: stats.totalGlobalProductsCount > 0 ? stats.totalGlobalProductsCount : null,
+      badgeColor: 'bg-emerald-100 text-emerald-800 font-bold'
+    },
+    {
       id: 'riders',
       label: 'Riders & Approvals',
       icon: Bike,
@@ -42,13 +49,6 @@ export default function AdminNavbar() {
       icon: Users,
       badge: stats.totalCustomersCount > 0 ? stats.totalCustomersCount : null,
       badgeColor: 'bg-stone-200 text-stone-700 font-bold'
-    },
-    {
-      id: 'any-store-catalog',
-      label: 'Any Store Catalog',
-      icon: Sparkles,
-      badge: stats.totalGlobalProductsCount > 0 ? stats.totalGlobalProductsCount : null,
-      badgeColor: 'bg-emerald-100 text-emerald-800 font-bold'
     },
     {
       id: 'orders',
@@ -84,7 +84,7 @@ export default function AdminNavbar() {
           <nav className="hidden lg:flex items-center gap-1 bg-stone-100/80 p-1 rounded-2xl border border-stone-200">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isActive = activeTab === item.id || (item.id === 'global-catalog' && activeTab === 'any-store-catalog');
               return (
                 <button
                   key={item.id}
@@ -133,7 +133,7 @@ export default function AdminNavbar() {
         <div className="lg:hidden flex items-center gap-1 overflow-x-auto py-2 border-t border-stone-100 scrollbar-none text-xs">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id || (item.id === 'global-catalog' && activeTab === 'any-store-catalog');
             return (
               <button
                 key={item.id}

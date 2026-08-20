@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import confetti from 'canvas-confetti';
 import { 
   fetchAllAdminShops, 
   approveShopInSupabase, 
@@ -15,13 +14,14 @@ import {
   createProductForShop,
   updateProductInSupabase,
   deleteProductInSupabase,
-  fetchGlobalCatalogProducts,
-  createGlobalCatalogProduct
+  fetchGlobalCatalog,
+  fetchGlobalCatalogStats,
+  createGlobalProduct,
+  assignProductToStore
 } from '../services/adminService';
 
 const AdminContext = createContext(null);
-
-const ADMIN_PASSWORD_HASH = 'arman@1234';
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim();
 
 export function AdminProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -38,11 +38,17 @@ export function AdminProvider({ children }) {
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [globalProducts, setGlobalProducts] = useState([]);
+  const [globalCatalogStats, setGlobalCatalogStats] = useState({
+    totalGlobalProducts: 0,
+    activeProducts: 0,
+    inactiveProducts: 0,
+    productsWithStores: 0,
+    productsWithoutStores: 0
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGlobalProducts, setIsLoadingGlobalProducts] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  // Add Toast Notification
   const addAdminToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -51,35 +57,36 @@ export function AdminProvider({ children }) {
     }, 4500);
   }, []);
 
-  // Login handler strictly requiring arman@1234
   const login = (password, username = 'Admin') => {
     if (!password) {
-      return { 
-        success: false, 
-        error: 'Please enter the administrator access password.' 
+      return { success: false, error: 'Please enter the administrator access password.' };
+    }
+
+    if (!ADMIN_PASSWORD) {
+      return {
+        success: false,
+        error: 'Admin access is not configured on this environment. Set VITE_ADMIN_PASSWORD in the deployment environment.'
       };
     }
 
-    if (password.trim() === ADMIN_PASSWORD_HASH) {
+    const incoming = password.trim();
+    const expected = ADMIN_PASSWORD;
+    if (incoming.length === expected.length && incoming === expected) {
       setIsAuthenticated(true);
       try {
         sessionStorage.setItem('gharsee_admin_authenticated', 'true');
         sessionStorage.setItem('gharsee_admin_user', username);
       } catch {}
       addAdminToast('Welcome to UR GROZY Admin Command Center 🛡️', 'success');
-      try {
-        confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-      } catch {}
       return { success: true };
     }
 
     return { 
       success: false, 
-      error: 'Access Denied: Invalid administrator credentials. Access to this command console is strictly restricted.' 
+      error: 'Access Denied: Invalid administrator credentials.' 
     };
   };
 
-  // Logout handler
   const logout = () => {
     setIsAuthenticated(false);
     try {
@@ -89,16 +96,23 @@ export function AdminProvider({ children }) {
     addAdminToast('Administrator session ended securely.', 'info');
   };
 
-  // Load "Shop From Any Store" Global Catalog
   const loadGlobalProducts = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoadingGlobalProducts(true);
-    const prods = await fetchGlobalCatalogProducts();
-    setGlobalProducts(prods);
-    setIsLoadingGlobalProducts(false);
+    try {
+      const [catRes, statsRes] = await Promise.all([
+        fetchGlobalCatalog({ limit: 50 }),
+        fetchGlobalCatalogStats()
+      ]);
+      setGlobalProducts(catRes.products || []);
+      setGlobalCatalogStats(statsRes);
+    } catch (err) {
+      console.error('Error loading global products in context:', err);
+    } finally {
+      setIsLoadingGlobalProducts(false);
+    }
   }, [isAuthenticated]);
 
-  // Refresh all dashboard collections from Supabase
   const refreshData = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
@@ -124,14 +138,12 @@ export function AdminProvider({ children }) {
     }
   }, [isAuthenticated, addAdminToast, loadGlobalProducts]);
 
-  // Initial load
   useEffect(() => {
     if (isAuthenticated) {
       refreshData();
     }
   }, [isAuthenticated, refreshData]);
 
-  // Real-time polling
   useEffect(() => {
     if (!isAuthenticated) return;
     const interval = setInterval(() => {
@@ -140,15 +152,11 @@ export function AdminProvider({ children }) {
     return () => clearInterval(interval);
   }, [isAuthenticated, refreshData]);
 
-  // Actions: Approve Shop
   const approveShop = async (shopId, shopName = 'Store') => {
     const success = await approveShopInSupabase(shopId);
     if (success) {
       setShops(prev => prev.map(s => s.id === shopId ? { ...s, isPending: false, isApproved: true, status: 'open', isOpen: true } : s));
       addAdminToast(`🎉 Store "${shopName}" approved & open on customer app!`, 'success');
-      try {
-        confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 } });
-      } catch {}
       await refreshData();
     } else {
       addAdminToast(`Failed to approve store "${shopName}".`, 'error');
@@ -156,9 +164,8 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  // Actions: Reject Shop
-  const rejectShop = async (shopId, shopName = 'Store', reason = 'Admin rejection') => {
-    const success = await rejectShopInSupabase(shopId, reason);
+  const rejectShop = async (shopId, shopName = 'Store') => {
+    const success = await rejectShopInSupabase(shopId);
     if (success) {
       setShops(prev => prev.map(s => s.id === shopId ? { ...s, isPending: false, isApproved: false, status: 'rejected', isOpen: false } : s));
       addAdminToast(`Store "${shopName}" rejected.`, 'info');
@@ -169,7 +176,6 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  // Actions: Toggle Shop Online / Offline
   const toggleShop = async (shopId, currentIsOpen) => {
     const nextState = !currentIsOpen;
     const success = await toggleShopStatusInSupabase(shopId, currentIsOpen);
@@ -180,15 +186,11 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  // Actions: Approve Rider
   const approveRider = async (riderId, riderName = 'Rider') => {
     const success = await approveRiderInSupabase(riderId);
     if (success) {
       setRiders(prev => prev.map(r => r.id === riderId ? { ...r, isPending: false, isApproved: true, status: 'active', isOnline: true } : r));
       addAdminToast(`🎉 Delivery Partner "${riderName}" approved & verified!`, 'success');
-      try {
-        confetti({ particleCount: 70, spread: 70, origin: { y: 0.7 } });
-      } catch {}
       await refreshData();
     } else {
       addAdminToast(`Failed to approve rider "${riderName}".`, 'error');
@@ -196,9 +198,8 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  // Actions: Reject Rider
-  const rejectRider = async (riderId, riderName = 'Rider', reason = 'Verification incomplete') => {
-    const success = await rejectRiderInSupabase(riderId, reason);
+  const rejectRider = async (riderId, riderName = 'Rider') => {
+    const success = await rejectRiderInSupabase(riderId);
     if (success) {
       setRiders(prev => prev.map(r => r.id === riderId ? { ...r, isPending: false, isApproved: false, status: 'rejected', isOnline: false } : r));
       addAdminToast(`Rider application for "${riderName}" rejected.`, 'info');
@@ -209,7 +210,6 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  // Actions: Update Order Status
   const updateOrderStatus = async (orderId, nextStatus) => {
     const success = await updateAdminOrderStatus(orderId, nextStatus);
     if (success) {
@@ -219,12 +219,10 @@ export function AdminProvider({ children }) {
     return success;
   };
 
-  // Store Products Inventory State (Store-Specific)
   const [selectedStoreForProducts, setSelectedStoreForProducts] = useState(null);
   const [storeProducts, setStoreProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
-  // Load products for a store
   const loadStoreProducts = useCallback(async (shopId) => {
     if (!shopId) return;
     setIsLoadingProducts(true);
@@ -233,7 +231,6 @@ export function AdminProvider({ children }) {
     setIsLoadingProducts(false);
   }, []);
 
-  // Open Product Manager for a Specific Store
   const openStoreProductManager = async (store) => {
     setSelectedStoreForProducts(store);
     await loadStoreProducts(store.id);
@@ -244,14 +241,10 @@ export function AdminProvider({ children }) {
     setStoreProducts([]);
   };
 
-  // Add Product to Store
   const addProductToStore = async (shopId, productData) => {
     const created = await createProductForShop(shopId, productData);
     if (created) {
       addAdminToast(`✨ Added "${productData.name}" to store catalog!`, 'success');
-      try {
-        confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
-      } catch {}
       await loadStoreProducts(shopId);
       setShops(prev => prev.map(s => s.id === shopId ? { ...s, productCount: (s.productCount || 0) + 1 } : s));
       return { success: true, product: created };
@@ -261,11 +254,10 @@ export function AdminProvider({ children }) {
     }
   };
 
-  // Update Existing Product (Store or Global)
   const updateProduct = async (productId, productData, shopId = null) => {
     const success = await updateProductInSupabase(productId, productData);
     if (success) {
-      addAdminToast(`Item "${productData.name}" updated successfully!`, 'success');
+      addAdminToast(`Item "${productData.name || 'Product'}" updated successfully!`, 'success');
       if (shopId) {
         await loadStoreProducts(shopId);
       }
@@ -277,7 +269,6 @@ export function AdminProvider({ children }) {
     }
   };
 
-  // Delete Product (Store or Global)
   const deleteProduct = async (productId, productName = 'Product', shopId = null) => {
     const success = await deleteProductInSupabase(productId);
     if (success) {
@@ -294,14 +285,10 @@ export function AdminProvider({ children }) {
     }
   };
 
-  // Add Item to "Shop From Any Store" Global Catalog
   const addGlobalProduct = async (productData) => {
-    const created = await createGlobalCatalogProduct(productData);
+    const created = await createGlobalProduct(productData);
     if (created) {
-      addAdminToast(`✨ Added "${productData.name}" to 'Shop From Any Store' catalog!`, 'success');
-      try {
-        confetti({ particleCount: 50, spread: 65, origin: { y: 0.6 } });
-      } catch {}
+      addAdminToast(`✨ Added "${productData.name}" to Global Catalog!`, 'success');
       await loadGlobalProducts();
       return { success: true, product: created };
     } else {
@@ -310,7 +297,6 @@ export function AdminProvider({ children }) {
     }
   };
 
-  // Computed Aggregated Metrics
   const pendingShopsCount = shops.filter(s => s.isPending).length;
   const approvedShopsCount = shops.filter(s => s.isApproved).length;
   const pendingRidersCount = riders.filter(r => r.isPending).length;
@@ -328,6 +314,7 @@ export function AdminProvider({ children }) {
     customers,
     orders,
     globalProducts,
+    globalCatalogStats,
     isLoading,
     isLoadingGlobalProducts,
     toasts,
@@ -341,7 +328,6 @@ export function AdminProvider({ children }) {
     rejectRider,
     updateOrderStatus,
     addAdminToast,
-    // Store Inventory Management
     selectedStoreForProducts,
     storeProducts,
     isLoadingProducts,
@@ -351,7 +337,6 @@ export function AdminProvider({ children }) {
     addProductToStore,
     updateProduct,
     deleteProduct,
-    // Global "Shop From Any Store" Management
     loadGlobalProducts,
     addGlobalProduct,
     stats: {
@@ -364,7 +349,7 @@ export function AdminProvider({ children }) {
       totalCustomersCount,
       totalOrdersCount,
       totalGmvRevenue,
-      totalGlobalProductsCount: globalProducts.length
+      totalGlobalProductsCount: globalCatalogStats.totalGlobalProducts || globalProducts.length
     }
   };
 

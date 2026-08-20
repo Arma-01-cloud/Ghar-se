@@ -1,29 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAdmin } from '../context/AdminContext';
-import { uploadImageFile } from '../services/adminService';
+import { 
+  fetchGlobalCatalog, 
+  assignProductToStore, 
+  uploadImageFile,
+  GLOBAL_CATEGORIES 
+} from '../services/adminService';
 import { 
   X, Plus, Edit2, Trash2, Search, Store, Package, 
   IndianRupee, CheckCircle2, AlertCircle, RefreshCw, 
-  Image as ImageIcon, Sparkles, Check, Tag, Layers, Upload
+  Image as ImageIcon, Check, Tag, Layers, Upload, ArrowRight
 } from 'lucide-react';
-
-const CATEGORIES = [
-  'Fresh Vegetables',
-  'Fresh Fruits',
-  'Dairy & Eggs',
-  'Rice & Grains',
-  'Cooking Oils & Ghee',
-  'Masalas & Spices',
-  'Atta, Flours & Sooji',
-  'Snacks & Biscuits',
-  'Beverages & Juices',
-  'Tea & Coffee',
-  'Cleaning Essentials',
-  'Personal Care',
-  'Bakery & Bread',
-  'Instant & Frozen Foods',
-  'General Groceries'
-];
 
 const PRESET_IMAGES = [
   { label: 'Veg & Fruits', url: '/images/cat_veg_fruits.jpg' },
@@ -31,8 +18,7 @@ const PRESET_IMAGES = [
   { label: 'Cooking Oil', url: '/images/cat_cooking_oils.jpg' },
   { label: 'Atta & Rice', url: '/images/cat_rice_grains.jpg' },
   { label: 'Snacks', url: '/images/cat_snacks_biscuits.jpg' },
-  { label: 'Beverages', url: '/images/cat_beverages_juices.jpg' },
-  { label: 'Store Front', url: '/images/store_lakshmi.jpg' }
+  { label: 'Beverages', url: '/images/cat_beverages_juices.jpg' }
 ];
 
 export default function AdminStoreProductsModal() {
@@ -44,11 +30,27 @@ export default function AdminStoreProductsModal() {
     loadStoreProducts,
     addProductToStore, 
     updateProduct, 
-    deleteProduct 
+    deleteProduct,
+    addAdminToast 
   } = useAdmin();
+
+  // Active View Tab: 'store-inventory' | 'browse-global'
+  const [activeModalTab, setActiveModalTab] = useState('store-inventory');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Global Catalog Picker State
+  const [globalCatalogItems, setGlobalCatalogItems] = useState([]);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [globalCatFilter, setGlobalCatFilter] = useState('all');
+  const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
+  const [assigningProduct, setAssigningProduct] = useState(null);
+  const [assignPrice, setAssignPrice] = useState('');
+  const [assignMrp, setAssignMrp] = useState('');
+  const [assignStock, setAssignStock] = useState('50');
+  const [assignSku, setAssignSku] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // Add / Edit Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -59,7 +61,8 @@ export default function AdminStoreProductsModal() {
 
   const [formData, setFormData] = useState({
     name: '',
-    category: 'Fresh Vegetables',
+    brand: 'Standard',
+    category: 'Rice & Grains',
     price: '',
     mrp: '',
     unit: '1 kg',
@@ -67,32 +70,63 @@ export default function AdminStoreProductsModal() {
     minThreshold: '5',
     imageUrl: '/images/cat_veg_fruits.jpg',
     description: '',
+    storeSku: '',
     isAvailable: true
   });
+
+  // Load Global Catalog items for quick assignment
+  useEffect(() => {
+    if (activeModalTab === 'browse-global' && selectedStoreForProducts) {
+      loadGlobalCatalog();
+    }
+  }, [activeModalTab, selectedStoreForProducts, globalSearch, globalCatFilter]);
+
+  const loadGlobalCatalog = async () => {
+    setIsLoadingGlobal(true);
+    try {
+      const res = await fetchGlobalCatalog({
+        limit: 50,
+        search: globalSearch,
+        category: globalCatFilter,
+        isActive: 'active'
+      });
+      setGlobalCatalogItems(res.products || []);
+    } catch (err) {
+      console.error('Error loading global catalog in store modal:', err);
+    } finally {
+      setIsLoadingGlobal(false);
+    }
+  };
 
   if (!selectedStoreForProducts) return null;
 
   const store = selectedStoreForProducts;
 
-  // Filter products by search and category
+  // Filter store products by search and category
   const filteredProducts = storeProducts.filter(p => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
-      p.name.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q) ||
-      p.unit.toLowerCase().includes(q)
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.category || '').toLowerCase().includes(q) ||
+      (p.unit || '').toLowerCase().includes(q) ||
+      (p.brand || '').toLowerCase().includes(q) ||
+      (p.storeSku || '').toLowerCase().includes(q)
     );
     if (!matchesSearch) return false;
-    if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
+    if (selectedCategory !== 'all' && (p.category || '').toLowerCase() !== selectedCategory.toLowerCase()) return false;
     return true;
   });
 
-  // Open Form for Adding New Product
+  // Existing store product global IDs to check for duplicates
+  const existingGlobalIds = new Set(storeProducts.map(p => p.globalProductId || p.id));
+
+  // Open Form for Adding New Product manually
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setFormData({
       name: '',
-      category: 'Fresh Vegetables',
+      brand: 'Standard',
+      category: 'Rice & Grains',
       price: '',
       mrp: '',
       unit: '1 kg',
@@ -100,6 +134,7 @@ export default function AdminStoreProductsModal() {
       minThreshold: '5',
       imageUrl: '/images/cat_veg_fruits.jpg',
       description: '',
+      storeSku: '',
       isAvailable: true
     });
     setIsFormOpen(true);
@@ -110,336 +145,543 @@ export default function AdminStoreProductsModal() {
     setEditingProduct(prod);
     setFormData({
       name: prod.name,
-      category: prod.category || 'Fresh Vegetables',
-      price: String(prod.price),
-      mrp: String(prod.mrp || prod.price),
+      brand: prod.brand || 'Standard',
+      category: prod.category || 'General Groceries',
+      price: String(prod.price || ''),
+      mrp: String(prod.mrp || prod.price || ''),
       unit: prod.unit || '1 kg',
-      stock: String(prod.stock),
-      minThreshold: String(prod.minThreshold || 5),
-      imageUrl: prod.imageUrl || '/images/cat_veg_fruits.jpg',
+      stock: String(prod.stock != null ? prod.stock : 50),
+      minThreshold: String(prod.minThreshold != null ? prod.minThreshold : 5),
+      imageUrl: prod.imageUrl || prod.image_url || '/images/cat_veg_fruits.jpg',
       description: prod.description || '',
-      isAvailable: prod.isAvailable !== false
+      storeSku: prod.storeSku || '',
+      isAvailable: prod.isAvailable !== false && prod.is_available !== false
     });
     setIsFormOpen(true);
   };
 
-  // Handle local file image upload
-  const handleImageFileUpload = async (e) => {
+  // Handle Image Upload
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploadingImage(true);
     try {
       const dataUrl = await uploadImageFile(file);
-      if (dataUrl) {
-        setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
-      }
+      setFormData(prev => ({ ...prev, imageUrl: dataUrl }));
+      addAdminToast('Image compressed & attached! ✓', 'success');
     } catch (err) {
-      console.error('Error uploading image:', err);
+      console.error('Image upload failed:', err);
+      addAdminToast(err.message || 'Image processing failed', 'error');
     } finally {
       setIsUploadingImage(false);
     }
   };
 
-  // Submit Add or Edit
+  // Submit Add / Edit Form
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.price) return;
+    if (!formData.name.trim() || !formData.price) {
+      addAdminToast('Please enter a product name and selling price.', 'error');
+      return;
+    }
 
     setIsSubmitting(true);
-    const productPayload = {
+
+    const payload = {
       name: formData.name.trim(),
+      brand: formData.brand.trim() || 'Standard',
       category: formData.category,
       price: parseFloat(formData.price),
-      mrp: parseFloat(formData.mrp || formData.price),
-      unit: formData.unit.trim() || '1 kg',
-      stock: parseInt(formData.stock || 50, 10),
+      mrp: formData.mrp ? parseFloat(formData.mrp) : parseFloat(formData.price),
+      unit: formData.unit.trim(),
+      stock: parseInt(formData.stock || 0, 10),
       minThreshold: parseInt(formData.minThreshold || 5, 10),
-      imageUrl: formData.imageUrl || '/images/cat_veg_fruits.jpg',
+      imageUrl: formData.imageUrl,
+      image_url: formData.imageUrl,
       description: formData.description.trim(),
+      storeSku: formData.storeSku.trim(),
       isAvailable: formData.isAvailable
     };
 
     if (editingProduct) {
-      await updateProduct(editingProduct.id, productPayload, store.id);
+      payload.globalProductId = editingProduct.globalProductId;
+      const success = await updateProduct(editingProduct.id, payload, store.id);
+      setIsSubmitting(false);
+      if (success) {
+        setIsFormOpen(false);
+      }
     } else {
-      await addProductToStore(store.id, productPayload);
+      const res = await addProductToStore(store.id, payload);
+      setIsSubmitting(false);
+      if (res?.success) {
+        setIsFormOpen(false);
+      }
+    }
+  };
+
+  // Assign product selected from Global Catalog to this store
+  const handleAssignFromGlobal = async (e) => {
+    e.preventDefault();
+    if (!assigningProduct || !assignPrice) {
+      addAdminToast('Please enter a valid price for this store.', 'error');
+      return;
     }
 
-    setIsSubmitting(false);
-    setIsFormOpen(false);
+    setIsAssigning(true);
+    const assigned = await assignProductToStore({
+      storeId: store.id,
+      globalProductId: assigningProduct.id,
+      price: parseFloat(assignPrice),
+      mrp: assignMrp ? parseFloat(assignMrp) : parseFloat(assignPrice),
+      stock: parseInt(assignStock || 0, 10),
+      storeSku: assignSku.trim(),
+      isAvailable: true
+    });
+    setIsAssigning(false);
+
+    if (assigned) {
+      addAdminToast(`✨ Assigned "${assigningProduct.name}" to ${store.name}!`, 'success');
+      setAssigningProduct(null);
+      setAssignPrice('');
+      setAssignMrp('');
+      setAssignStock('50');
+      setAssignSku('');
+      await loadStoreProducts(store.id);
+      setActiveModalTab('store-inventory');
+    } else {
+      addAdminToast('Failed to assign product to store.', 'error');
+    }
   };
 
-  // Quick In-Stock Status Toggle
-  const handleToggleStock = async (prod) => {
-    const nextAvailable = !prod.isAvailable;
-    await updateProduct(prod.id, { ...prod, isAvailable: nextAvailable }, store.id);
-  };
-
-  // Confirm and Delete Product
   const handleDelete = async (prod) => {
-    if (window.confirm(`Are you sure you want to delete "${prod.name}" from ${store.name}?`)) {
-      await deleteProduct(prod.id, prod.name, store.id);
+    if (!window.confirm(`Are you sure you want to remove "${prod.name}" from ${store.name}?`)) {
+      return;
     }
+    await deleteProduct(prod.id, prod.name, store.id);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-stone-950/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-3xl border border-stone-200 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto">
+    <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* MODAL HEADER */}
-        <div className="bg-stone-50 border-b border-stone-200 px-6 py-5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <img
-              src={store.imageUrl}
+        <div className="p-4 sm:p-6 bg-stone-900 text-white flex items-start justify-between gap-4 border-b border-stone-800">
+          <div className="flex items-center gap-3.5">
+            <img 
+              src={store.imageUrl || store.image_url || '/images/store_lakshmi.jpg'} 
               alt={store.name}
-              className="w-12 h-12 rounded-2xl object-cover border border-stone-300 shrink-0 shadow-xs"
+              className="w-14 h-14 object-cover rounded-2xl bg-stone-800 border border-stone-700 shrink-0"
               onError={(e) => { e.target.src = '/images/store_lakshmi.jpg'; }}
             />
-            <div className="min-w-0">
+            <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-display font-black text-stone-900 text-lg sm:text-xl truncate">
-                  {store.name}
-                </h3>
-                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
-                  STORE CATALOG
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {store.locality || store.city || 'Store Partner'}
+                </span>
+                <span className="text-[10px] font-bold text-stone-400">
+                  {store.phone}
                 </span>
               </div>
-              <p className="text-xs text-stone-500 font-medium truncate mt-0.5">
-                {store.locality}, {store.city} • <strong className="text-stone-700 font-bold">{storeProducts.length} Items Listed in Supabase</strong>
+              <h2 className="font-display font-extrabold text-xl text-white mt-1">
+                {store.name} • Inventory Management
+              </h2>
+              <p className="text-xs text-stone-400 mt-0.5">
+                {storeProducts.length} items in store inventory • Linked to UR GROZY Global Product Catalog
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleOpenAdd}
-              className="py-2.5 px-4 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span className="hidden sm:inline">Add New Product</span>
-            </button>
-
-            <button
-              onClick={closeStoreProductManager}
-              className="p-2 rounded-xl bg-stone-200/80 hover:bg-rose-100 hover:text-rose-700 text-stone-600 transition-all cursor-pointer"
-              title="Close modal"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button 
+            onClick={closeStoreProductManager}
+            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* SEARCH & CATEGORY FILTER BAR */}
-        <div className="p-4 sm:p-5 border-b border-stone-200/80 bg-white space-y-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            
-            {/* SEARCH */}
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
-              <input
-                type="text"
-                placeholder="Search products in this store..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-2xl pl-10 pr-4 py-2 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600 placeholder:text-stone-400"
-              />
-            </div>
-
-            {/* REFRESH BUTTON */}
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button
-                onClick={() => loadStoreProducts(store.id)}
-                disabled={isLoadingProducts}
-                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Reload products from Supabase"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingProducts ? 'animate-spin text-emerald-700' : ''}`} />
-                <span className="text-xs">Refresh Catalog</span>
-              </button>
-            </div>
-          </div>
-
-          {/* CATEGORY CHIPS */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        {/* TAB SELECTOR: STORE INVENTORY vs ADD FROM GLOBAL CATALOG */}
+        <div className="bg-stone-100 px-4 sm:px-6 py-2 border-b border-stone-200 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-                selectedCategory === 'all'
-                  ? 'bg-emerald-800 text-white shadow-xs font-black'
-                  : 'bg-stone-100 text-stone-600 hover:text-stone-900 border border-stone-200'
+              onClick={() => setActiveModalTab('store-inventory')}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                activeModalTab === 'store-inventory'
+                  ? 'bg-white text-emerald-900 shadow-xs border border-stone-200'
+                  : 'text-stone-600 hover:text-stone-900'
               }`}
             >
-              All Items ({storeProducts.length})
+              Current Store Inventory ({storeProducts.length})
             </button>
-            {CATEGORIES.map((cat) => {
-              const count = storeProducts.filter(p => p.category === cat).length;
-              if (count === 0 && selectedCategory !== cat) return null;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                    selectedCategory === cat
-                      ? 'bg-emerald-800 text-white shadow-xs font-black'
-                      : 'bg-stone-100 text-stone-600 hover:text-stone-900 border border-stone-200'
-                  }`}
-                >
-                  <span>{cat}</span>
-                  <span className="text-[10px] opacity-75 font-semibold">({count})</span>
-                </button>
-              );
-            })}
+            <button
+              onClick={() => setActiveModalTab('browse-global')}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeModalTab === 'browse-global'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>+ Add from Global Catalog</span>
+            </button>
           </div>
-        </div>
 
-        {/* PRODUCTS LIST CONTAINER */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#FBF9F5]">
-          {isLoadingProducts ? (
-            <div className="py-16 text-center space-y-3">
-              <RefreshCw className="w-8 h-8 text-emerald-700 animate-spin mx-auto" />
-              <p className="text-xs font-bold text-stone-600">Loading store products from Supabase...</p>
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-3xl border border-stone-200 p-8 space-y-4 shadow-sm max-w-lg mx-auto">
-              <div className="w-14 h-14 rounded-3xl bg-emerald-50 text-emerald-800 flex items-center justify-center mx-auto border border-emerald-200">
-                <Package className="w-7 h-7 stroke-[2]" />
-              </div>
-              <div>
-                <h4 className="font-display font-black text-stone-900 text-lg">
-                  {searchQuery || selectedCategory !== 'all' ? 'No Matching Products' : 'No Products in this Store Yet'}
-                </h4>
-                <p className="text-xs text-stone-500 font-medium max-w-sm mx-auto mt-1">
-                  {searchQuery || selectedCategory !== 'all'
-                    ? 'Try clearing your search filters or selected category.'
-                    : `Add products specifically for ${store.name}. When customers open this store, they will see only these products.`}
-                </p>
-              </div>
-              <button
-                onClick={handleOpenAdd}
-                className="py-3 px-5 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-2xl shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Add First Product to {store.name}</span>
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProducts.map((prod) => {
-                const discount = prod.mrp && prod.mrp > prod.price
-                  ? Math.round(((prod.mrp - prod.price) / prod.mrp) * 100)
-                  : 0;
-
-                return (
-                  <div
-                    key={prod.id}
-                    className={`bg-white rounded-3xl border p-4 space-y-3 shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
-                      !prod.isAvailable ? 'opacity-70 border-stone-300 bg-stone-50/70' : 'border-stone-200 hover:border-emerald-300'
-                    }`}
-                  >
-                    
-                    <div className="space-y-3">
-                      {/* THUMBNAIL & TOP BADGES */}
-                      <div className="flex items-start gap-3">
-                        <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 shrink-0">
-                          <img
-                            src={prod.imageUrl}
-                            alt={prod.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
-                          />
-                          {discount > 0 && (
-                            <span className="absolute top-1 left-1 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-md shadow-2xs">
-                              {discount}% OFF
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block mb-1">
-                            {prod.category}
-                          </span>
-                          <h4 className="font-extrabold text-stone-900 text-sm leading-snug line-clamp-2">
-                            {prod.name}
-                          </h4>
-                          <p className="text-xs text-stone-500 font-semibold mt-0.5">
-                            {prod.unit}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* PRICE & STOCK METRICS */}
-                      <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200/80 flex items-center justify-between text-xs">
-                        <div>
-                          <span className="text-stone-400 text-[10px] font-bold uppercase block">Selling Price</span>
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="font-display font-black text-stone-900 text-base">
-                              ₹{prod.price}
-                            </span>
-                            {prod.mrp && prod.mrp > prod.price && (
-                              <span className="text-stone-400 line-through text-[11px] font-medium">
-                                ₹{prod.mrp}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-stone-400 text-[10px] font-bold uppercase block">Stock Count</span>
-                          <span className="font-bold text-stone-800 font-mono text-xs">
-                            {prod.stock} units
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ACTION CONTROLS */}
-                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => handleToggleStock(prod)}
-                        className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
-                          prod.isAvailable
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 border border-rose-300 hover:bg-rose-200'
-                        }`}
-                      >
-                        {prod.isAvailable ? '🟢 In Stock' : '🔴 Out of Stock'}
-                      </button>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenEdit(prod)}
-                          className="p-1.5 rounded-xl bg-stone-100 hover:bg-emerald-100 text-stone-600 hover:text-emerald-800 border border-stone-200 transition-all cursor-pointer"
-                          title="Edit product"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => handleDelete(prod)}
-                          className="p-1.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-600 hover:text-rose-700 border border-stone-200 transition-all cursor-pointer"
-                          title="Delete product"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
+          {activeModalTab === 'store-inventory' && (
+            <button
+              onClick={handleOpenAdd}
+              className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Custom Product</span>
+            </button>
           )}
         </div>
 
+        {/* TAB 1: CURRENT STORE INVENTORY */}
+        {activeModalTab === 'store-inventory' && (
+          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 bg-[#FBF9F5]">
+            
+            {/* SEARCH & FILTER BAR */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Search store inventory..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700"
+                />
+              </div>
+
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-700 focus:outline-hidden"
+              >
+                <option value="all">All Categories</option>
+                {GLOBAL_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => loadStoreProducts(store.id)}
+                disabled={isLoadingProducts}
+                className="p-2 bg-white border border-stone-200 rounded-xl text-stone-700 hover:bg-stone-50 transition-colors cursor-pointer"
+                title="Refresh Store Products"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingProducts ? 'animate-spin text-emerald-700' : ''}`} />
+              </button>
+            </div>
+
+            {/* INVENTORY TABLE */}
+            <div className="bg-white rounded-3xl border border-stone-200 shadow-xs overflow-hidden">
+              {isLoadingProducts ? (
+                <div className="py-16 text-center text-xs font-bold text-stone-400">
+                  Loading store products...
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-16 text-center space-y-3">
+                  <Package className="w-10 h-10 text-stone-300 mx-auto" />
+                  <p className="text-xs font-bold text-stone-500">No products in this store inventory yet.</p>
+                  <button
+                    onClick={() => setActiveModalTab('browse-global')}
+                    className="px-4 py-2 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 transition-colors cursor-pointer"
+                  >
+                    Browse Global Catalog & Add Products
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-stone-50 border-b border-stone-200 text-stone-400 font-black text-[10px] uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3.5">Product</th>
+                        <th className="p-3.5">Category</th>
+                        <th className="p-3.5">Store Price</th>
+                        <th className="p-3.5">MRP</th>
+                        <th className="p-3.5">Stock</th>
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 font-semibold text-stone-800">
+                      {filteredProducts.map(prod => (
+                        <tr key={prod.id} className="hover:bg-stone-50/60 transition-colors">
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-3">
+                              <img 
+                                src={prod.image || prod.imageUrl || prod.image_url || '/images/cat_veg_fruits.jpg'} 
+                                alt="" 
+                                className="w-10 h-10 object-cover rounded-xl bg-stone-100 border border-stone-200 shrink-0"
+                                onError={(e) => { e.target.src = '/images/cat_veg_fruits.jpg'; }}
+                              />
+                              <div>
+                                <p className="font-extrabold text-stone-900 text-sm">{prod.name}</p>
+                                <span className="text-[10px] text-stone-400">{prod.brand || 'Standard'} • {prod.unit}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="p-3.5 text-stone-600 font-medium">
+                            {prod.category}
+                          </td>
+
+                          <td className="p-3.5 font-black text-stone-900 text-sm">
+                            ₹{prod.price}
+                          </td>
+
+                          <td className="p-3.5 text-stone-400">
+                            ₹{prod.mrp || prod.price}
+                          </td>
+
+                          <td className="p-3.5 font-bold text-stone-800">
+                            {prod.stock} {prod.unit}
+                          </td>
+
+                          <td className="p-3.5">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              prod.isAvailable && prod.stock > 0
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {prod.isAvailable && prod.stock > 0 ? 'Available' : 'Out of Stock'}
+                            </span>
+                          </td>
+
+                          <td className="p-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleOpenEdit(prod)}
+                                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer"
+                                title="Edit Price & Stock"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(prod)}
+                                className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                                title="Remove from Store"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 2: BROWSE & ADD FROM GLOBAL CATALOG */}
+        {activeModalTab === 'browse-global' && (
+          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 bg-[#FBF9F5]">
+            
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h4 className="font-extrabold text-xs text-emerald-950">Select Products from UR GROZY Global Catalog</h4>
+                <p className="text-[11px] text-emerald-800">
+                  Quickly add universal grocery items to <strong>{store.name}</strong> and set store-specific pricing.
+                </p>
+              </div>
+            </div>
+
+            {/* SEARCH GLOBAL CATALOG */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Search global products..."
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700"
+                />
+              </div>
+
+              <select
+                value={globalCatFilter}
+                onChange={(e) => setGlobalCatFilter(e.target.value)}
+                className="px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-700 focus:outline-hidden"
+              >
+                <option value="all">All Categories</option>
+                {GLOBAL_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* GLOBAL PRODUCTS GRID */}
+            {isLoadingGlobal ? (
+              <div className="py-16 text-center text-xs font-bold text-stone-400">
+                Loading Global Catalog...
+              </div>
+            ) : globalCatalogItems.length === 0 ? (
+              <div className="py-16 text-center text-stone-400 text-xs font-bold">
+                No matching global products found.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {globalCatalogItems.map(gp => {
+                  const isAlreadyInStore = existingGlobalIds.has(gp.id);
+
+                  return (
+                    <div 
+                      key={gp.id}
+                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                        isAlreadyInStore
+                          ? 'bg-stone-50 border-stone-200 opacity-60'
+                          : 'bg-white border-stone-200 hover:border-emerald-500 shadow-2xs hover:shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img 
+                          src={gp.imageUrl || gp.image_url} 
+                          alt="" 
+                          className="w-12 h-12 rounded-xl object-cover bg-stone-100 border border-stone-200 shrink-0" 
+                        />
+                        <div className="min-w-0">
+                          <h5 className="font-extrabold text-stone-900 text-xs truncate">{gp.name}</h5>
+                          <p className="text-[10px] text-stone-500">{gp.brand} • {gp.unit}</p>
+                          <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 rounded font-bold">
+                            {gp.category}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isAlreadyInStore ? (
+                        <span className="text-[10px] font-black text-stone-400 shrink-0 uppercase tracking-wider">
+                          In Store ✓
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAssigningProduct(gp);
+                            setAssignPrice('');
+                            setAssignMrp('');
+                            setAssignStock('50');
+                            setAssignSku('');
+                          }}
+                          className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-[11px] rounded-xl transition-colors shrink-0 cursor-pointer shadow-2xs"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ASSIGN PRICING MODAL OVERLAY */}
+            {assigningProduct && (
+              <div className="fixed inset-0 z-60 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-stone-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                    <div>
+                      <h4 className="font-display font-extrabold text-base text-stone-900">Set Store Pricing</h4>
+                      <p className="text-xs text-stone-500">{assigningProduct.name} ({assigningProduct.unit})</p>
+                    </div>
+                    <button onClick={() => setAssigningProduct(null)} className="text-stone-400 hover:text-stone-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleAssignFromGlobal} className="space-y-3">
+                    <div>
+                      <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                        Selling Price (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        placeholder="e.g. 150"
+                        value={assignPrice}
+                        onChange={(e) => setAssignPrice(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                        MRP (₹) (Optional)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        placeholder="e.g. 165"
+                        value={assignMrp}
+                        onChange={(e) => setAssignMrp(e.target.value)}
+                        className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                        Initial Stock Units
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="50"
+                        value={assignStock}
+                        onChange={(e) => setAssignStock(e.target.value)}
+                        className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-black text-stone-600 uppercase tracking-wider block mb-1">
+                        Store SKU (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. LAK-01"
+                        value={assignSku}
+                        onChange={(e) => setAssignSku(e.target.value)}
+                        className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-mono text-stone-900 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
+                      <button
+                        type="button"
+                        onClick={() => setAssigningProduct(null)}
+                        className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isAssigning}
+                        className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs shadow-xs"
+                      >
+                        {isAssigning ? 'Adding...' : 'Add to Store'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
         {/* MODAL FOOTER */}
-        <div className="bg-stone-50 border-t border-stone-200 px-6 py-4 flex items-center justify-between text-xs text-stone-500 font-medium">
-          <span>
-            ℹ️ Products created here are stored with <code className="text-emerald-800 font-bold">shop_id = {store.id}</code> in Supabase.
+        <div className="p-4 bg-white border-t border-stone-200 flex items-center justify-between">
+          <span className="text-xs text-stone-400 font-medium">
+            UR GROZY Store Inventory Synchronizer
           </span>
           <button
             onClick={closeStoreProductManager}
-            className="py-2 px-4 rounded-xl bg-stone-200/80 hover:bg-stone-300 text-stone-800 font-bold transition-all cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs transition-colors cursor-pointer"
           >
             Close
           </button>
@@ -447,242 +689,134 @@ export default function AdminStoreProductsModal() {
 
       </div>
 
-      {/* ADD / EDIT PRODUCT DRAWER / MODAL */}
+      {/* MANUAL ADD / EDIT DRAWER */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-stone-950/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-full max-w-lg rounded-3xl border border-stone-200 shadow-2xl p-6 sm:p-7 space-y-5 my-auto max-h-[90vh] overflow-y-auto">
-            
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div>
-                <h4 className="font-display font-black text-stone-900 text-lg">
-                  {editingProduct ? `Edit Product` : `Add New Product to ${store.name}`}
-                </h4>
-                <p className="text-xs text-stone-500 font-medium mt-0.5">
-                  Set price, unit, image upload, and inventory stock in Supabase.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setIsFormOpen(false)}
-                className="p-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-60 bg-stone-950/70 backdrop-blur-sm flex justify-end animate-fade-in">
+          <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-slide-left">
+            <div className="p-5 bg-stone-900 text-white flex items-center justify-between border-b border-stone-800">
+              <h3 className="font-display font-black text-lg text-white">
+                {editingProduct ? 'Edit Store Product' : 'Add Custom Product'}
+              </h3>
+              <button onClick={() => setIsFormOpen(false)} className="text-stone-400 hover:text-white">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold">
-              
-              {/* NAME */}
-              <div>
-                <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-                  Product Name *
-                </label>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 bg-[#FBF9F5]">
+              <div className="space-y-1">
+                <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Product Name *</label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Fresh Tomato (Desi / Naati), Nandini Milk 500ml"
+                  placeholder="e.g. Fresh Tomatoes"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                  required
+                  className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                 />
               </div>
 
-              {/* CATEGORY */}
-              <div>
-                <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-                  Category *
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600 cursor-pointer"
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* PRICE & MRP */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-                    Selling Price (₹) *
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Selling Price (₹) *</label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    placeholder="e.g. 45"
+                    step="0.5"
+                    placeholder="50"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                    required
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-                    MRP / Original (₹)
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">MRP (₹)</label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="e.g. 60 (for discount)"
+                    step="0.5"
+                    placeholder="60"
                     value={formData.mrp}
                     onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
-                    className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              {/* UNIT & STOCK */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-                    Unit / Weight *
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+                  >
+                    {GLOBAL_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Unit / Size</label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. 1 kg, 500g, 1L, 1 pack"
+                    placeholder="1 kg"
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-stone-700 font-bold mb-1 uppercase tracking-wider">
-                    Stock Quantity *
-                  </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Stock Level</label>
                   <input
                     type="number"
-                    min="0"
-                    required
-                    placeholder="e.g. 50"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600"
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-stone-700 uppercase tracking-wider block">Store SKU</label>
+                  <input
+                    type="text"
+                    placeholder="SKU-XXX"
+                    value={formData.storeSku}
+                    onChange={(e) => setFormData({ ...formData, storeSku: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-mono text-stone-900 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              {/* IMAGE UPLOAD & PRESETS */}
-              <div className="space-y-2">
-                <label className="block text-stone-700 font-bold uppercase tracking-wider">
-                  Product Image (Upload File or Select Preset)
+              <div className="pt-2 border-t border-stone-200">
+                <label className="flex items-center gap-2 text-xs font-bold text-stone-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isAvailable}
+                    onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
+                    className="rounded text-emerald-700"
+                  />
+                  <span>Available in Store</span>
                 </label>
-
-                {/* DIRECT FILE UPLOAD BUTTON & DROPZONE */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageFileUpload}
-                  accept="image/*"
-                  className="hidden"
-                />
-
-                <div className="flex items-center gap-3 p-3 bg-stone-50 border border-dashed border-stone-300 rounded-2xl">
-                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-stone-200 shrink-0 border border-stone-300 flex items-center justify-center">
-                    {formData.imageUrl ? (
-                      <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon className="w-6 h-6 text-stone-400" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingImage}
-                      className="py-1.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>{isUploadingImage ? 'Uploading Image...' : 'Upload Image from Computer'}</span>
-                    </button>
-                    <span className="text-[11px] text-stone-400 block mt-1">Supports PNG, JPG, WebP photos</span>
-                  </div>
-                </div>
-
-                {/* PRESET IMAGE SELECTOR */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1">
-                  {PRESET_IMAGES.map((img) => (
-                    <button
-                      key={img.url}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, imageUrl: img.url })}
-                      className={`relative w-12 h-12 rounded-xl overflow-hidden border shrink-0 transition-all cursor-pointer ${
-                        formData.imageUrl === img.url
-                          ? 'border-emerald-600 ring-2 ring-emerald-400'
-                          : 'border-stone-200 opacity-70 hover:opacity-100'
-                      }`}
-                      title={img.label}
-                    >
-                      <img src={img.url} alt={img.label} className="w-full h-full object-cover" />
-                      {formData.imageUrl === img.url && (
-                        <div className="absolute inset-0 bg-emerald-900/40 flex items-center justify-center text-white">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="Or enter custom image URL directly"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-300 rounded-2xl px-4 py-2 text-xs font-semibold text-stone-900 focus:outline-none focus:border-emerald-600 placeholder:text-stone-400"
-                />
               </div>
 
-              {/* IN STOCK STATUS SWITCH */}
-              <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
-                <div>
-                  <span className="font-bold text-stone-900 block">Item Available for Order</span>
-                  <span className="text-[11px] text-stone-500 font-normal">If turned off, customer app will display as Out of Stock</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, isAvailable: !formData.isAvailable })}
-                  className={`w-12 h-7 rounded-full p-1 transition-colors cursor-pointer ${formData.isAvailable ? 'bg-emerald-700' : 'bg-stone-300'}`}
-                >
-                  <div className={`w-5 h-5 rounded-full bg-white transition-transform ${formData.isAvailable ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
-              </div>
-
-              {/* ACTION BUTTONS */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-100">
+              <div className="flex items-center justify-end gap-2 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="py-2.5 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold transition-all cursor-pointer"
+                  className="px-4 py-2 bg-stone-100 rounded-xl text-xs font-bold text-stone-700"
                 >
                   Cancel
                 </button>
-
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="py-2.5 px-5 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-extrabold shadow-xs"
                 >
-                  {isSubmitting ? (
-                    <span>Saving to Supabase...</span>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{editingProduct ? 'Update Product' : 'Save Product'}</span>
-                    </>
-                  )}
+                  {isSubmitting ? 'Saving...' : 'Save Product'}
                 </button>
               </div>
-
             </form>
-
           </div>
         </div>
       )}

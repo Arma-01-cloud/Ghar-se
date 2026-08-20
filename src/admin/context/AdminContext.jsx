@@ -15,19 +15,15 @@ import {
   createProductForShop,
   updateProductInSupabase,
   deleteProductInSupabase,
-  fetchGlobalCatalogProducts,
-  createGlobalCatalogProduct
+  fetchGlobalCatalog,
+  fetchGlobalCatalogStats,
+  createGlobalProduct,
+  assignProductToStore
 } from '../services/adminService';
 
 const AdminContext = createContext(null);
 
 // SECURITY: Admin password is read from VITE_ADMIN_PASSWORD env var.
-// In production deployments, VITE_ADMIN_PASSWORD MUST be set to a strong value
-// (e.g. via the hosting platform's environment variable configuration). If it
-// is not set, admin login is disabled entirely to prevent default-credential
-// access. This is a defense-in-depth measure; the admin console is intended
-// to be moved behind a server-side check (e.g. Supabase Edge Function) in the
-// next iteration.
 const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim();
 
 export function AdminProvider({ children }) {
@@ -45,6 +41,13 @@ export function AdminProvider({ children }) {
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [globalProducts, setGlobalProducts] = useState([]);
+  const [globalCatalogStats, setGlobalCatalogStats] = useState({
+    totalGlobalProducts: 0,
+    activeProducts: 0,
+    inactiveProducts: 0,
+    productsWithStores: 0,
+    productsWithoutStores: 0
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGlobalProducts, setIsLoadingGlobalProducts] = useState(false);
   const [toasts, setToasts] = useState([]);
@@ -74,7 +77,6 @@ export function AdminProvider({ children }) {
       };
     }
 
-    // Constant-time compare to avoid trivial timing oracles.
     const incoming = password.trim();
     const expected = ADMIN_PASSWORD;
     if (incoming.length === expected.length && incoming === expected) {
@@ -106,13 +108,22 @@ export function AdminProvider({ children }) {
     addAdminToast('Administrator session ended securely.', 'info');
   };
 
-  // Load "Shop From Any Store" Global Catalog
+  // Load Global Catalog
   const loadGlobalProducts = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoadingGlobalProducts(true);
-    const prods = await fetchGlobalCatalogProducts();
-    setGlobalProducts(prods);
-    setIsLoadingGlobalProducts(false);
+    try {
+      const [catRes, statsRes] = await Promise.all([
+        fetchGlobalCatalog({ limit: 50 }),
+        fetchGlobalCatalogStats()
+      ]);
+      setGlobalProducts(catRes.products || []);
+      setGlobalCatalogStats(statsRes);
+    } catch (err) {
+      console.error('Error loading global products in context:', err);
+    } finally {
+      setIsLoadingGlobalProducts(false);
+    }
   }, [isAuthenticated]);
 
   // Refresh all dashboard collections from Supabase
@@ -282,7 +293,7 @@ export function AdminProvider({ children }) {
   const updateProduct = async (productId, productData, shopId = null) => {
     const success = await updateProductInSupabase(productId, productData);
     if (success) {
-      addAdminToast(`Item "${productData.name}" updated successfully!`, 'success');
+      addAdminToast(`Item "${productData.name || 'Product'}" updated successfully!`, 'success');
       if (shopId) {
         await loadStoreProducts(shopId);
       }
@@ -311,11 +322,11 @@ export function AdminProvider({ children }) {
     }
   };
 
-  // Add Item to "Shop From Any Store" Global Catalog
+  // Add Item to Global Catalog
   const addGlobalProduct = async (productData) => {
-    const created = await createGlobalCatalogProduct(productData);
+    const created = await createGlobalProduct(productData);
     if (created) {
-      addAdminToast(`✨ Added "${productData.name}" to 'Shop From Any Store' catalog!`, 'success');
+      addAdminToast(`✨ Added "${productData.name}" to Global Catalog!`, 'success');
       try {
         confetti({ particleCount: 50, spread: 65, origin: { y: 0.6 } });
       } catch {}
@@ -345,6 +356,7 @@ export function AdminProvider({ children }) {
     customers,
     orders,
     globalProducts,
+    globalCatalogStats,
     isLoading,
     isLoadingGlobalProducts,
     toasts,
@@ -368,7 +380,7 @@ export function AdminProvider({ children }) {
     addProductToStore,
     updateProduct,
     deleteProduct,
-    // Global "Shop From Any Store" Management
+    // Global Catalog Management
     loadGlobalProducts,
     addGlobalProduct,
     stats: {
@@ -381,7 +393,7 @@ export function AdminProvider({ children }) {
       totalCustomersCount,
       totalOrdersCount,
       totalGmvRevenue,
-      totalGlobalProductsCount: globalProducts.length
+      totalGlobalProductsCount: globalCatalogStats.totalGlobalProducts || globalProducts.length
     }
   };
 

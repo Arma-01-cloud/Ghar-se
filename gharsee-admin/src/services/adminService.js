@@ -1,17 +1,48 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { 
+  fetchGlobalCatalog,
+  fetchGlobalCatalogStats,
+  checkDuplicateGlobalProduct,
+  createGlobalProduct,
+  updateGlobalProduct,
+  deleteGlobalProduct,
+  fetchStoreAssignmentsForProduct,
+  assignProductToStore,
+  updateStoreProductPricing,
+  removeProductFromStore,
+  fetchStoreInventory,
+  GLOBAL_CATEGORIES
+} from './globalCatalogService';
+
+export {
+  fetchGlobalCatalog,
+  fetchGlobalCatalogStats,
+  checkDuplicateGlobalProduct,
+  createGlobalProduct,
+  updateGlobalProduct,
+  deleteGlobalProduct,
+  fetchStoreAssignmentsForProduct,
+  assignProductToStore,
+  updateStoreProductPricing,
+  removeProductFromStore,
+  fetchStoreInventory,
+  GLOBAL_CATEGORIES
+};
 
 // Fetch all stores with approval, operational status, and live product count
 export async function fetchAllAdminShops() {
   if (!isSupabaseConfigured) return [];
 
   try {
-    const [shopsRes, prodsRes] = await Promise.all([
+    const [shopsRes, prodsRes, storeProdsRes] = await Promise.all([
       supabase.from('shops').select('*').order('created_at', { ascending: false }),
-      supabase.from('products').select('id, shop_id')
+      supabase.from('products').select('id, shop_id'),
+      supabase.from('store_products').select('id, store_id')
     ]);
 
     const { data, error } = shopsRes;
     const { data: allProducts } = prodsRes;
+    const { data: allStoreProducts } = storeProdsRes;
 
     if (error || !data) {
       console.error('Error fetching admin shops:', error);
@@ -22,6 +53,12 @@ export async function fetchAllAdminShops() {
     (allProducts || []).forEach(p => {
       if (p.shop_id) {
         prodCountMap.set(p.shop_id, (prodCountMap.get(p.shop_id) || 0) + 1);
+      }
+    });
+
+    (allStoreProducts || []).forEach(sp => {
+      if (sp.store_id) {
+        prodCountMap.set(sp.store_id, (prodCountMap.get(sp.store_id) || 0) + 1);
       }
     });
 
@@ -74,23 +111,8 @@ export async function approveShopInSupabase(shopId) {
       })
       .eq('id', shopId);
 
-    if (error) {
-      console.warn('First approveShop update failed, trying fallback without updated_at:', error.message);
-      const { error: err2 } = await supabase
-        .from('shops')
-        .update({
-          status: 'open',
-          is_open: true,
-          is_approved: true
-        })
-        .eq('id', shopId);
-
-      return !err2;
-    }
-
-    return true;
+    return !error;
   } catch (err) {
-    console.error('Exception in approveShopInSupabase:', err);
     return false;
   }
 }
@@ -110,22 +132,8 @@ export async function rejectShopInSupabase(shopId) {
       })
       .eq('id', shopId);
 
-    if (error) {
-      const { error: err2 } = await supabase
-        .from('shops')
-        .update({
-          status: 'rejected',
-          is_open: false,
-          is_approved: false
-        })
-        .eq('id', shopId);
-
-      return !err2;
-    }
-
-    return true;
+    return !error;
   } catch (err) {
-    console.error('Exception in rejectShopInSupabase:', err);
     return false;
   }
 }
@@ -147,21 +155,8 @@ export async function toggleShopStatusInSupabase(shopId, currentIsOpen) {
       })
       .eq('id', shopId);
 
-    if (error) {
-      const { error: err2 } = await supabase
-        .from('shops')
-        .update({
-          is_open: nextIsOpen,
-          status: nextStatus
-        })
-        .eq('id', shopId);
-
-      return !err2;
-    }
-
-    return true;
+    return !error;
   } catch (err) {
-    console.error('Exception in toggleShopStatusInSupabase:', err);
     return false;
   }
 }
@@ -176,10 +171,7 @@ export async function fetchAllAdminRiders() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data) {
-      console.error('Error fetching admin riders:', error);
-      return [];
-    }
+    if (error || !data) return [];
 
     return data.map(r => {
       const isOnline = Boolean(r.is_online);
@@ -204,7 +196,6 @@ export async function fetchAllAdminRiders() {
       };
     });
   } catch (err) {
-    console.error('Exception in fetchAllAdminRiders:', err);
     return [];
   }
 }
@@ -224,22 +215,8 @@ export async function approveRiderInSupabase(riderId) {
       })
       .eq('id', riderId);
 
-    if (error) {
-      const { error: err2 } = await supabase
-        .from('rider_profiles')
-        .update({
-          is_approved: true,
-          is_online: true,
-          status: 'approved'
-        })
-        .eq('id', riderId);
-
-      return !err2;
-    }
-
-    return true;
+    return !error;
   } catch (err) {
-    console.error('Exception in approveRiderInSupabase:', err);
     return false;
   }
 }
@@ -259,22 +236,8 @@ export async function rejectRiderInSupabase(riderId) {
       })
       .eq('id', riderId);
 
-    if (error) {
-      const { error: err2 } = await supabase
-        .from('rider_profiles')
-        .update({
-          is_approved: false,
-          is_online: false,
-          status: 'rejected'
-        })
-        .eq('id', riderId);
-
-      return !err2;
-    }
-
-    return true;
+    return !error;
   } catch (err) {
-    console.error('Exception in rejectRiderInSupabase:', err);
     return false;
   }
 }
@@ -289,10 +252,7 @@ export async function fetchAllAdminCustomers() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data) {
-      console.error('Error fetching admin customers:', error);
-      return [];
-    }
+    if (error || !data) return [];
 
     return data.map(c => ({
       id: c.id,
@@ -308,7 +268,6 @@ export async function fetchAllAdminCustomers() {
       createdAt: c.created_at || new Date().toISOString()
     }));
   } catch (err) {
-    console.error('Exception in fetchAllAdminCustomers:', err);
     return [];
   }
 }
@@ -323,10 +282,7 @@ export async function fetchAllAdminOrders() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data) {
-      console.error('Error fetching admin orders:', error);
-      return [];
-    }
+    if (error || !data) return [];
 
     return data.map(o => ({
       id: o.id,
@@ -344,7 +300,6 @@ export async function fetchAllAdminOrders() {
       createdAt: o.created_at || new Date().toISOString()
     }));
   } catch (err) {
-    console.error('Exception in fetchAllAdminOrders:', err);
     return [];
   }
 }
@@ -364,35 +319,36 @@ export async function updateAdminOrderStatus(orderId, nextStatus) {
 
     return !error;
   } catch (err) {
-    console.error('Exception in updateAdminOrderStatus:', err);
     return false;
   }
 }
-
-// -------------------------------------------------------------
-// STORE INVENTORY & PRODUCT MANAGEMENT (ADMIN & STORE-SPECIFIC)
-// -------------------------------------------------------------
 
 // Fetch all products belonging to a specific store
 export async function fetchProductsForShop(shopId) {
   if (!isSupabaseConfigured || !shopId) return [];
 
   try {
+    const inventory = await fetchStoreInventory(shopId);
+    if (inventory && inventory.length > 0) {
+      return inventory;
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('shop_id', shopId)
       .order('created_at', { ascending: false });
 
-    if (error || !data) {
-      console.error('Error fetching products for shop:', error);
-      return [];
-    }
+    if (error || !data) return [];
 
     return data.map(p => ({
       id: p.id,
+      storeProductId: p.id,
+      globalProductId: p.id,
       shopId: p.shop_id,
+      storeId: p.shop_id,
       name: p.name,
+      brand: p.brand || 'Store Fresh',
       category: p.category || 'Groceries',
       price: parseFloat(p.price || 0),
       mrp: parseFloat(p.mrp || p.price || 0),
@@ -400,12 +356,13 @@ export async function fetchProductsForShop(shopId) {
       stock: p.stock != null ? parseInt(p.stock, 10) : 50,
       minThreshold: p.min_threshold != null ? parseInt(p.min_threshold, 10) : 5,
       imageUrl: p.image_url || '/images/cat_veg_fruits.jpg',
+      image_url: p.image_url || '/images/cat_veg_fruits.jpg',
       description: p.description || '',
       isAvailable: p.is_available !== false,
+      is_available: p.is_available !== false,
       createdAt: p.created_at || new Date().toISOString()
     }));
   } catch (err) {
-    console.error('Exception in fetchProductsForShop:', err);
     return [];
   }
 }
@@ -415,6 +372,41 @@ export async function createProductForShop(shopId, productData) {
   if (!isSupabaseConfigured || !shopId) return null;
 
   try {
+    let globalId = productData.globalProductId;
+
+    if (!globalId) {
+      const createdGlobal = await createGlobalProduct({
+        name: productData.name,
+        brand: productData.brand || 'Standard',
+        category: productData.category || 'General Groceries',
+        unit: productData.unit || '1 kg',
+        quantity: productData.quantity || 1,
+        imageUrl: productData.imageUrl || productData.image_url,
+        description: productData.description || '',
+        barcode: productData.barcode || null,
+        searchKeywords: productData.searchKeywords || null
+      });
+
+      if (createdGlobal) {
+        globalId = createdGlobal.id;
+      }
+    }
+
+    if (globalId) {
+      const assigned = await assignProductToStore({
+        storeId: shopId,
+        globalProductId: globalId,
+        price: productData.price,
+        mrp: productData.mrp,
+        stock: productData.stock,
+        minThreshold: productData.minThreshold,
+        isAvailable: productData.isAvailable !== false,
+        storeSku: productData.storeSku || ''
+      });
+
+      if (assigned) return assigned;
+    }
+
     const payload = {
       shop_id: shopId,
       name: (productData.name || '').trim(),
@@ -424,50 +416,20 @@ export async function createProductForShop(shopId, productData) {
       unit: productData.unit || '1 kg',
       stock: parseInt(productData.stock || 50, 10),
       min_threshold: parseInt(productData.minThreshold || 5, 10),
-      image_url: productData.imageUrl || '/images/cat_veg_fruits.jpg',
+      image_url: productData.imageUrl || productData.image_url || '/images/cat_veg_fruits.jpg',
       description: productData.description || '',
-      is_available: productData.isAvailable !== false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      is_available: productData.isAvailable !== false
     };
 
-    const { data, error } = await supabase
+    const { data: legacyData, error: legacyErr } = await supabase
       .from('products')
       .insert([payload])
       .select()
       .maybeSingle();
 
-    if (error) {
-      console.warn('Supabase product insert with timestamp failed, attempting standard payload:', error.message);
-      const fallbackPayload = {
-        shop_id: shopId,
-        name: (productData.name || '').trim(),
-        category: productData.category || 'Groceries',
-        price: parseFloat(productData.price || 0),
-        mrp: parseFloat(productData.mrp || productData.price || 0),
-        unit: productData.unit || '1 kg',
-        stock: parseInt(productData.stock || 50, 10),
-        image_url: productData.imageUrl || '/images/cat_veg_fruits.jpg',
-        description: productData.description || '',
-        is_available: productData.isAvailable !== false
-      };
-
-      const { data: retryData, error: retryErr } = await supabase
-        .from('products')
-        .insert([fallbackPayload])
-        .select()
-        .maybeSingle();
-
-      if (retryErr) {
-        console.error('Fallback product insert error:', retryErr);
-        return null;
-      }
-      return retryData;
-    }
-
-    return data;
+    if (legacyErr) return null;
+    return legacyData;
   } catch (err) {
-    console.error('Exception in createProductForShop:', err);
     return null;
   }
 }
@@ -477,6 +439,23 @@ export async function updateProductInSupabase(productId, productData) {
   if (!isSupabaseConfigured || !productId) return false;
 
   try {
+    const spSuccess = await updateStoreProductPricing({
+      storeProductId: productId,
+      price: productData.price,
+      mrp: productData.mrp,
+      stock: productData.stock,
+      minThreshold: productData.minThreshold,
+      isAvailable: productData.isAvailable,
+      storeSku: productData.storeSku
+    });
+
+    if (spSuccess) {
+      if (productData.globalProductId && productData.name) {
+        await updateGlobalProduct(productData.globalProductId, productData);
+      }
+      return true;
+    }
+
     const updatePayload = {
       name: (productData.name || '').trim(),
       category: productData.category,
@@ -484,7 +463,7 @@ export async function updateProductInSupabase(productId, productData) {
       mrp: parseFloat(productData.mrp || productData.price || 0),
       unit: productData.unit || '1 kg',
       stock: parseInt(productData.stock || 0, 10),
-      image_url: productData.imageUrl,
+      image_url: productData.imageUrl || productData.image_url,
       description: productData.description || '',
       is_available: productData.isAvailable !== false,
       updated_at: new Date().toISOString()
@@ -495,40 +474,43 @@ export async function updateProductInSupabase(productId, productData) {
       .update(updatePayload)
       .eq('id', productId);
 
-    if (error) {
-      console.warn('Supabase product update error, trying fallback:', error.message);
-      const { error: err2 } = await supabase
-        .from('products')
-        .update({
-          name: (productData.name || '').trim(),
-          category: productData.category,
-          price: parseFloat(productData.price || 0),
-          mrp: parseFloat(productData.mrp || productData.price || 0),
-          unit: productData.unit || '1 kg',
-          stock: parseInt(productData.stock || 0, 10),
-          image_url: productData.imageUrl,
-          description: productData.description || '',
-          is_available: productData.isAvailable !== false
-        })
-        .eq('id', productId);
-
-      return !err2;
-    }
-
-    return true;
+    return !error;
   } catch (err) {
-    console.error('Exception in updateProductInSupabase:', err);
     return false;
   }
 }
 
-// -------------------------------------------------------------
-// IMAGE UPLOAD & PROCESSING UTILITY
-// -------------------------------------------------------------
+// Delete product from Supabase
+export async function deleteProductInSupabase(productId) {
+  if (!isSupabaseConfigured || !productId) return false;
 
-// Compress and convert image File to optimized web Data URL
+  try {
+    const spRemoved = await removeProductFromStore(productId);
+    if (spRemoved) return true;
+
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+
+    return !error;
+  } catch (err) {
+    return false;
+  }
+}
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
 export async function uploadImageFile(file) {
   if (!file) return null;
+
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error('Unsupported image type. Please upload a JPEG, PNG, WEBP, or GIF file.');
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error('Image is too large. Maximum allowed size is 5 MB.');
+  }
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -562,7 +544,6 @@ export async function uploadImageFile(file) {
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           resolve(dataUrl);
         } catch {
-          // If canvas fails, return original data URL
           resolve(e.target.result);
         }
       };
@@ -570,122 +551,4 @@ export async function uploadImageFile(file) {
     };
     reader.readAsDataURL(file);
   });
-}
-
-// -------------------------------------------------------------
-// "SHOP FROM ANY STORE" (GLOBAL CATALOG) MANAGEMENT
-// -------------------------------------------------------------
-
-// Fetch all universal products for "Shop From Any Store"
-export async function fetchGlobalCatalogProducts() {
-  if (!isSupabaseConfigured) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error || !data) {
-      console.error('Error fetching global catalog products:', error);
-      return [];
-    }
-
-    return data.map(p => ({
-      id: p.id,
-      shopId: p.shop_id,
-      isGlobal: !p.shop_id,
-      name: p.name,
-      category: p.category || 'Groceries',
-      price: parseFloat(p.price || 0),
-      mrp: parseFloat(p.mrp || p.price || 0),
-      unit: p.unit || '1 kg',
-      stock: p.stock != null ? parseInt(p.stock, 10) : 50,
-      minThreshold: p.min_threshold != null ? parseInt(p.min_threshold, 10) : 5,
-      imageUrl: p.image_url || '/images/cat_veg_fruits.jpg',
-      description: p.description || '',
-      isAvailable: p.is_available !== false,
-      createdAt: p.created_at || new Date().toISOString()
-    }));
-  } catch (err) {
-    console.error('Exception in fetchGlobalCatalogProducts:', err);
-    return [];
-  }
-}
-
-// Add a new universal item for "Shop From Any Store" in Supabase
-export async function createGlobalCatalogProduct(productData) {
-  if (!isSupabaseConfigured) return null;
-
-  try {
-    const payload = {
-      name: (productData.name || '').trim(),
-      category: productData.category || 'Groceries',
-      price: parseFloat(productData.price || 0),
-      mrp: parseFloat(productData.mrp || productData.price || 0),
-      unit: productData.unit || '1 kg',
-      stock: parseInt(productData.stock || 100, 10),
-      min_threshold: parseInt(productData.minThreshold || 10, 10),
-      image_url: productData.imageUrl || '/images/cat_veg_fruits.jpg',
-      description: productData.description || '',
-      is_available: productData.isAvailable !== false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase
-      .from('products')
-      .insert([payload])
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      console.warn('Supabase global product insert retry with fallback payload:', error.message);
-      const fallbackPayload = {
-        name: (productData.name || '').trim(),
-        category: productData.category || 'Groceries',
-        price: parseFloat(productData.price || 0),
-        mrp: parseFloat(productData.mrp || productData.price || 0),
-        unit: productData.unit || '1 kg',
-        stock: parseInt(productData.stock || 100, 10),
-        image_url: productData.imageUrl || '/images/cat_veg_fruits.jpg',
-        description: productData.description || '',
-        is_available: productData.isAvailable !== false
-      };
-
-      const { data: retryData, error: retryErr } = await supabase
-        .from('products')
-        .insert([fallbackPayload])
-        .select()
-        .maybeSingle();
-
-      if (retryErr) {
-        console.error('Fallback global product insert error:', retryErr);
-        return null;
-      }
-      return retryData;
-    }
-
-    return data;
-  } catch (err) {
-    console.error('Exception in createGlobalCatalogProduct:', err);
-    return null;
-  }
-}
-
-// Delete product from Supabase
-export async function deleteProductInSupabase(productId) {
-  if (!isSupabaseConfigured || !productId) return false;
-
-  try {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', productId);
-
-    return !error;
-  } catch (err) {
-    console.error('Exception in deleteProductInSupabase:', err);
-    return false;
-  }
 }

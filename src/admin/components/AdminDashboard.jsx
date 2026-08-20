@@ -5,7 +5,7 @@ import AdminOverviewTab from './AdminOverviewTab';
 import AdminShopsTab from './AdminShopsTab';
 import AdminRidersTab from './AdminRidersTab';
 import AdminCustomersTab from './AdminCustomersTab';
-import AdminAnyStoreCatalogTab from './AdminAnyStoreCatalogTab';
+import AdminGlobalCatalogTab from './AdminGlobalCatalogTab';
 import AdminOrdersTab from './AdminOrdersTab';
 import AdminStoreProductsModal from './AdminStoreProductsModal';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
@@ -27,7 +27,7 @@ export default function AdminDashboard() {
         {activeTab === 'shops' && <AdminShopsTab />}
         {activeTab === 'riders' && <AdminRidersTab />}
         {activeTab === 'customers' && <AdminCustomersTab />}
-        {activeTab === 'any-store-catalog' && <AdminAnyStoreCatalogTab />}
+        {(activeTab === 'global-catalog' || activeTab === 'any-store-catalog') && <AdminGlobalCatalogTab />}
         {activeTab === 'orders' && <AdminOrdersTab />}
 
       </main>
